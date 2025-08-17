@@ -15,7 +15,7 @@ REQUIRED_SETTINGS = {
 }
 
 # Mandatory options for all publications
-PUBLICATION_OPTIONS = ["pptx_directory","publish_directory","filename_prefix"]
+PUBLICATION_OPTIONS = set(["pptx_directory","publish_directory","filename_prefix"])
 
 def load_config():
     config = configparser.ConfigParser()
@@ -32,7 +32,7 @@ def load_config():
     publications = []
   
     # Ensure all mandatory sections/keys exist
-    for section, keys in MANDATORY_SETTINGS.items():
+    for section, keys in REQUIRED_SETTINGS.items():
         if not config.has_section(section):
             config.add_section(section)
             modified = True
@@ -50,8 +50,8 @@ def load_config():
       # Check if all required options are there
       if PUBLICATION_OPTIONS.issubset(keys):
         publications.append(section)        
-    if count(publications) == 0:
-      config.set("publication")
+    if len(publications) == 0:
+      config.add_section("publication")
       for key in PUBLICATION_OPTIONS:
         config.set("publication",key, "") #add empty publication key
       modified = True
@@ -68,7 +68,7 @@ def load_config():
             print(f"  - {item}")
         print(f"\nPlease edit {CONFIG_FILE} and fill in the missing values.")
         sys.exit(1)
-    if count(publications) == 0:
+    if len(publications) == 0:
         print(f"[ERROR] At least one publication required! Added empty one to {CONFIG_FILE}!")
         sys.exit(1)
     return config
