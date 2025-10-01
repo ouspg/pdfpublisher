@@ -216,16 +216,16 @@ if __name__ == "__main__":
 
             # First check the slides, later additional materials
             if not n in slide_updates:
-                print(f"Luentomateriaali {n} -> Luento {lecturenumber}: luentokalvot eivät vielä saatavilla")
+                print(f"Luentomateriaali {n} -> {config[pub]['lectureterm']} {lecturenumber}: luentokalvot eivät vielä saatavilla")
             elif not n in pubslides:
-                print(f"Luentomateriaali {n} -> Luento {lecturenumber}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
+                print(f"Luentomateriaali {n} -> {config[pub]['lectureterm']} {lecturenumber}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
             elif published_slides.exists() and slide_updates[n]["modtime"] <= published_slides.stat().st_mtime and pubslides[n]["modtime"] <= published_slides.stat().st_mtime:
-                print(f"Luentomateriaali {n} -> Luento {lecturenumber}: ajan tasalla")
+                print(f"Luentomateriaali {n} -> {config[pub]['lectureterm']} {lecturenumber}: ajan tasalla")
             else:
                 if not published_slides.exists():
-                    print(f"Luentomateriaali {n} -> Luento {lecturenumber}: ei vielä julkaistu -> julkaistaan")
+                    print(f"Luentomateriaali {n} -> {config[pub]['lectureterm']} {lecturenumber}: ei vielä julkaistu -> julkaistaan")
                 else:
-                    print(f"Luentomateriaali {n} -> Luento {lecturenumber} on päivitetty -> julkaistaan")
+                    print(f"Luentomateriaali {n} -> {config[pub]['lectureterm']} {lecturenumber} on päivitetty -> julkaistaan")
                 newslides = PdfWriter()
 
                 # Take starting slide, update course and lecture name
