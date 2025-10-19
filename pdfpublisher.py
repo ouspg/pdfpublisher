@@ -21,7 +21,7 @@ FOOTER_FILE = "footer"
 
 # Required mandatory configurations
 REQUIRED_SETTINGS = {
-    "settings": ["slides_dir","headerfile","footerfile","dividerfile","lecturecount"],
+    "settings": ["lecture_slides_dir","headerfile","footerfile","dividerfile","lecturecount"],
     "titlefont": ["font","font_max_size","font_min_size","colour","maxlines"],
 }
 
@@ -32,7 +32,7 @@ PUBLICATION_OPTIONS = set(["coursename",
 "lectures",
 "lectureterm",
 "filename_prefix",
-"slides_dir",
+"course_slides_dir",
 "publish_dir"])
 
 def load_config():
@@ -67,8 +67,7 @@ def load_config():
       keys = set(config[section].keys())
       # Check if all required options are there
       if PUBLICATION_OPTIONS.issubset(keys):
-        course = Course(config.get(section, "").get("coursename", "Course name was not available"), 0, 0)
-        publications.append(course)
+        publications.append(section)    
     if len(publications) == 0:
       config.add_section("publication")
       for key in PUBLICATION_OPTIONS:
@@ -178,29 +177,56 @@ def load_full_directory(directory):
         files[f.name]["modtime"] = mtime
     return files
 
+def create_course_object(config, pub):
+    course_code = config[pub]["coursecode"]
+    course_size = config[pub]["coursesize"]
+    name = config[pub]["coursename"]
+    filename_prefix = config[pub]["filename_prefix"]
+    lectures = config[pub]["lectures"]
+    lecture_term = config[pub]["lectureterm"]
+    publication_dir = config[pub]["publish_dir"]
+    course_dir = config[pub]["course_slides_dir"]
+
+    return Course(course_code,
+                    int(course_size),
+                    lectures,
+                    name,
+                    filename_prefix,
+                    lecture_term,
+                    publication_dir,
+                    course_dir
+            )
+
 #############################################################################
 # MAIN
 #############################################################################
 if __name__ == "__main__":
     (config, publications) = load_config()
     print("Config loaded successfully!")
-
-    slide_updates = load_directory(config['settings']['slides_dir'])
+    slide_updates = load_directory(config['settings']['lecture_slides_dir'])
 
     for pub in publications:
         print(f"Tarkistetaan {config[pub]['coursename']}")
+        # create Course obj
+        course_object = create_course_object(config, pub)
+
+        # Debug: print course object attributes
+        from pprint import pprint
+        import inspect
+        pprint({name: val for name, val in inspect.getmembers(course_object)
+        if not name.startswith("__") and not inspect.isroutine(val)})
 
         #Load publication-specific update dates
-        pubslides = load_directory(config[pub]['slides_dir'])
+        pubslides = load_directory(config[pub]['lecture_slides_dir'])
 
 	# Support for not all courses containing all lectures:
         lectures = {int(x.strip()) for x in config[pub]["lectures"].split(",")}
         lecturenumber = 1
 
         # Load header/footer slides
-        Startingslides = PdfReader(Path(config[pub]['slides_dir']) / config["settings"]["headerfile"])
-        Dividerslides = PdfReader(Path(config[pub]['slides_dir']) / config["settings"]["dividerfile"])
-        Endingslides = PdfReader(Path(config[pub]['slides_dir']) / config["settings"]["footerfile"])
+        Startingslides = PdfReader(Path(config[pub]['lecture_slides_dir']) / config["settings"]["headerfile"])
+        Dividerslides = PdfReader(Path(config[pub]['lecture_slides_dir']) / config["settings"]["dividerfile"])
+        Endingslides = PdfReader(Path(config[pub]['lecture_slides_dir']) / config["settings"]["footerfile"])
 
         # Go through all or a subset of lectures
         for n in range(1, int(config["settings"]["lecturecount"])+1):
