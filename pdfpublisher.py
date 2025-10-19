@@ -10,7 +10,7 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.lib import colors
 
-from index import Course, Lecture, Topic
+#from index import Course, Lecture, Topic
 
 #############################################################################
 # CONFIGURATION
@@ -60,7 +60,7 @@ def load_config():
                 config.set(section, key, "")  # ensure entry exists but is empty
                 modified = True
                 missing.append(f"{section}.{key}")
-
+              
     # Do we have publication targets?
     for section in config.sections():
       # Collect keys present in this section
