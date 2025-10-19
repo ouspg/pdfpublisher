@@ -10,7 +10,7 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.lib import colors
 
-from index import Course, Lecture, Topic
+#from index import Course, Lecture, Topic
 
 #############################################################################
 # CONFIGURATION
@@ -60,15 +60,14 @@ def load_config():
                 config.set(section, key, "")  # ensure entry exists but is empty
                 modified = True
                 missing.append(f"{section}.{key}")
-
+              
     # Do we have publication targets?
     for section in config.sections():
       # Collect keys present in this section
       keys = set(config[section].keys())
       # Check if all required options are there
       if PUBLICATION_OPTIONS.issubset(keys):
-        course = Course(config.get(section, "").get("coursename", "Course name was not available"), 0, 0)
-        publications.append(course)
+        publications.append(section)        
     if len(publications) == 0:
       config.add_section("publication")
       for key in PUBLICATION_OPTIONS:
@@ -184,6 +183,8 @@ def load_full_directory(directory):
 if __name__ == "__main__":
     (config, publications) = load_config()
     print("Config loaded successfully!")
+
+
 
     slide_updates = load_directory(config['settings']['slides_dir'])
 
