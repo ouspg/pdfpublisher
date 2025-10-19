@@ -1,24 +1,33 @@
-
-
 class Course:
-    def __init__(self, name: str, lecture_count: int, course_number: int):
+    def __init__(self, coursecode: str, coursesize: int, lectures: int, name: str, filename_prefix: str, lectureterm: str, publication_dir: str):
         self.name = name
-        self.course_number = course_number
-        self.lectures = list()
-        self.lecture_count = lecture_count
+        self.coursecode = coursecode
+        self.coursesize = coursesize
+        self.lectures = lectures
+        self.filename_prefix = filename_prefix
+        self.lectureterm = lectureterm
+        self.publication_dir = publication_dir
+        self.lecture_list = list()
 
-    def add_lecture(self, lecture):
+    def add_lecture(self, name, lectureNumber, topic_list):
+        self.lecture_list.append(
+            Lecture(name, lectureNumber, topic_list)
+        )
+
+"""
         if isinstance(lecture, Lecture):
-            self.lectures.append(lecture)
-            self.lecture_count += 1
+            self.lecture_list.append(lecture)
         else:
             raise TypeError("You can only add Lecture objects.")
+"""
+
 
 
 class Lecture():
-    def __init__(self, name: str):
+    def __init__(self, name: str, lectureNumber: int, topic_list: list):
         self.name = name
-        self.topics = list()
+        self.lectureNumber = lectureNumber
+        self.topic_list = topic_list
 
     def add_topic(self, topic):
         if isinstance(topic, Topic):
@@ -30,14 +39,10 @@ class Lecture():
 class Topic():
     def __init__(self, name: str):
         self.name = name
-        self.uid = self._set_uid()
-
-    def _set_uid(self) -> str:
-        return sha256(self.name.encode('utf-8')).hexdigest()[:10]
 
 if __name__ == "__main__":
-    # Example usage
-    course = Course("My course", 0, 69420)
+    # test code
+    course = Course("My course", 0)
     lecture1 = Lecture("Lecture 1")
     lecture2 = Lecture("Lecture 2")
     topic1a = Topic("Topic A")
