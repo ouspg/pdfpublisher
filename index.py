@@ -1,9 +1,9 @@
-from hashlib import sha256
 
 
 class Course:
-    def __init__(self, name: str, lecture_count: int):
+    def __init__(self, name: str, lecture_count: int, course_number: int):
         self.name = name
+        self.course_number = course_number
         self.lectures = list()
         self.lecture_count = lecture_count
 
@@ -37,7 +37,7 @@ class Topic():
 
 if __name__ == "__main__":
     # Example usage
-    course = Course("My course", 0)
+    course = Course("My course", 0, 69420)
     lecture1 = Lecture("Lecture 1")
     lecture2 = Lecture("Lecture 2")
     topic1a = Topic("Topic A")
