@@ -30,40 +30,16 @@ class Lecture():
         self.topic_list = topic_list
 
     def add_topic(self, topic):
-        if isinstance(topic, Topic):
-            self.topics.append(topic)
-        else:
-            raise TypeError("You can only add Topic objects.")
-
-
-class Topic():
-    def __init__(self, name: str):
-        self.name = name
+        self.topics.append(topic)
 
 if __name__ == "__main__":
     # test code
-    course = Course("My course", 0)
-    lecture1 = Lecture("Lecture 1")
-    lecture2 = Lecture("Lecture 2")
-    topic1a = Topic("Topic A")
-    topic2a = Topic("Topic B")
+    course = Course("123456A", 100, 2,"My course", "MC_", "Fall2024", "/path/to/publication/dir")
+    lecture1 = Lecture("Lecture 1", "1", ["Topic A", "Topic B"])
+    lecture2 = Lecture("Lecture 2", "2", [])
+    course.add_lecture("lecture 1", 1, ["Topic A", "Topic B"])
+    course.add_lecture("lecture 2", 2, ["Topic c"])
 
-    print("UIDs for topics:")
-    print(getattr(topic1a, "uid", None))
-    print(getattr(topic2a, "uid", None))
-
-    course.add_lecture(lecture1)
-    course.add_lecture(lecture2)
-
-    print(f"{course.name} has following lectures: {[x.name for x in course.lectures]}")
-
-    lecture1.add_topic(topic1a)
-    lecture1.add_topic(topic2a)
-    print(f"{lecture1.name} has following topics: {[x.name for x in lecture1.topics]}")
-    lecture2.add_topic(topic2a)
-    print(f"{lecture2.name} has following topics: {[x.name for x in lecture2.topics]}")
-
-    for lecture in course.lectures:
-        print(f"Topics on {lecture.name}")
-        for topic in lecture.topics:
-            print(topic.name)
+    print(f"{course.name} has following lectures: {[x.name for x in course.lecture_list]}")
+    for lecture in course.lecture_list:
+        print(f"{course.name} has following topics in {lecture.name} {[x for x in lecture.topic_list]}")
