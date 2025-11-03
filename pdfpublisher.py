@@ -217,7 +217,7 @@ if __name__ == "__main__":
                             config[pub]['filename_prefix'],
                             config[pub]['lectureterm'],
                             config[pub]['publish_dir'],
-                            config[pub]['slides_dir'])
+                            config[pub]['course_slides_dir'])
 
         #Load publication-specific update dates
         pubslides = load_directory(pubObject.course_slides_dir)
