@@ -248,7 +248,7 @@ if __name__ == "__main__":
         #TODO: rework this to account for oob and Settings.ini changes?
         for n in range(1, courseObject.lectures+1):
             #If not included in this publication, continue
-            if n not in lectures:
+            if n not in [lecture.lectureNumber for lecture in courseObject.lecture_list]:
                 print(f"Luentomateriaali {n}: tämä luento ei sisälly tähän kurssiin.")
                 continue
 
@@ -284,9 +284,10 @@ if __name__ == "__main__":
 
                 # Insert lecture slides
                 #TODO: make the lecture slides from the topics here?
-                Lectureslides = PdfReader(slide_updates[n]["file"])
-                for page in Lectureslides.pages:
-                    newslides.add_page(page)
+                for topic in [lecture.topic_list for lecture in courseObject.lecture_list]:
+                    Lectureslides = PdfReader(slide_updates[n]["file"])
+                    for page in Lectureslides.pages:
+                        newslides.add_page(page)
 
 		# Insert divider slides
                 for page in Dividerslides.pages:
