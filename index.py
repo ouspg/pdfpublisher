@@ -10,9 +10,9 @@ class Course:
         self.course_slides_dir = course_slides_dir
         self.lecture_list = list()
 
-    def add_lecture(self, name, lectureNumber, topic_list):
+    def add_lecture(self, name, lectureNumber, list):
         self.lecture_list.append(
-            Lecture(name, lectureNumber, topic_list)
+            Lecture(name, lectureNumber, list)
         )
 
 """
@@ -21,8 +21,6 @@ class Course:
         else:
             raise TypeError("You can only add Lecture objects.")
 """
-
-
 
 class Lecture():
     def __init__(self, name: str, lectureNumber: int, topic_list: list):

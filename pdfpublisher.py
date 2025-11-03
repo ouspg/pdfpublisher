@@ -203,32 +203,49 @@ def create_course_object(config, pub):
 if __name__ == "__main__":
     (config, publications) = load_config()
     print("Config loaded successfully!")
-    slide_updates = load_directory(config['settings']['lecture_slides_dir'])
+
+# TODO: check for errors in class implementation
+
+    slide_updates = load_directory(config['settings']['slides_dir'])
 
     for pub in publications:
         print(f"Tarkistetaan {config[pub]['coursename']}")
-        # create Course obj
-        course_object = create_course_object(config, pub)
-
-        # Debug: print course object attributes
-        from pprint import pprint
-        import inspect
-        pprint({name: val for name, val in inspect.getmembers(course_object)
-        if not name.startswith("__") and not inspect.isroutine(val)})
+        pubObject = Course(config[pub]['coursecode'],
+                            int(config[pub]['coursesize']),
+                            int(config[pub]['lectures']),
+                            config[pub]['coursename'],
+                            config[pub]['filename_prefix'],
+                            config[pub]['lectureterm'],
+                            config[pub]['publish_dir'],
+                            config[pub]['slides_dir'])
 
         #Load publication-specific update dates
-        pubslides = load_directory(config[pub]['lecture_slides_dir'])
+        pubslides = load_directory(pubObject.course_slides_dir)
 
 	# Support for not all courses containing all lectures:
+    #TODO: Make lecture object here? Or atleast rework the next line to work with the lecture objects.
+        try:
+            for x in range(1, pubObject.lectures+1):
+                lecturelist = config[pub][str(x)].split(",")
+                lecture_name = lecturelist.pop(0).strip()
+                pubObject.add_lecture(lecture_name, x, [topic.strip() for topic in lecturelist])
+        except KeyError:
+            print(f"Courses should be added as <lecturenumber = name, topic1, topic2 ... topicN> under publication {pubObject.name} in settings.ini")
+            continue
+        #old code:
+        """
         lectures = {int(x.strip()) for x in config[pub]["lectures"].split(",")}
         lecturenumber = 1
+        """
+        
 
         # Load header/footer slides
-        Startingslides = PdfReader(Path(config[pub]['lecture_slides_dir']) / config["settings"]["headerfile"])
-        Dividerslides = PdfReader(Path(config[pub]['lecture_slides_dir']) / config["settings"]["dividerfile"])
-        Endingslides = PdfReader(Path(config[pub]['lecture_slides_dir']) / config["settings"]["footerfile"])
+        Startingslides = PdfReader(Path(pubObject.course_slides_dir) / config["settings"]["headerfile"])
+        Dividerslides = PdfReader(Path(pubObject.course_slides_dir) / config["settings"]["dividerfile"])
+        Endingslides = PdfReader(Path(pubObject.course_slides_dir) / config["settings"]["footerfile"])
 
         # Go through all or a subset of lectures
+        #TODO: rework this to account for oob and Settings.ini changes?
         for n in range(1, int(config["settings"]["lecturecount"])+1):
             #If not included in this publication, continue
             if n not in lectures:
@@ -236,11 +253,11 @@ if __name__ == "__main__":
                 continue
 
             # Check if the publication folder exists, create if necessary, check published file
-            matpubdir = f"{config[pub]['publish_dir']}/{config[pub]['lectureterm']} {lecturenumber:02}"
+            matpubdir = f"{pubObject.publication_dir}/{pubObject.lectureterm} {lecturenumber:02}"
             matpubpath = Path(matpubdir)
             if not matpubpath.exists():
                 matpubpath.mkdir(parents=True, exist_ok=True)
-            filename = re.sub(r'[\\/]', '', f"{lecturenumber:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm'].lower()} {lecturenumber} – {config['settings'][str(n)]}.pdf")[:200]
+            filename = re.sub(r'[\\/]', '', f"{lecturenumber:02} - {pubObject.filename_prefix} {pubObject.lectureterm.lower()} {lecturenumber} – {config['settings'][str(n)]}.pdf")[:200]
             published_slides = matpubpath / filename
 
             # First check the slides, later additional materials
@@ -259,13 +276,14 @@ if __name__ == "__main__":
 
                 # Take starting slide, update course and lecture name
                 firstslide = Startingslides.pages[0]
-                add_title(firstslide,config[pub]["lectureterm"],n,config["settings"][str(n)],config["titlefont"]["font"],int(config["titlefont"]["font_max_size"]),int(config["titlefont"]["font_max_size"]),config["titlefont"]["colour"],int(config["titlefont"]["maxlines"]));
+                add_title(firstslide,pubObject.lectureterm,n,config["settings"][str(n)],config["titlefont"]["font"],int(config["titlefont"]["font_max_size"]),int(config["titlefont"]["font_max_size"]),config["titlefont"]["colour"],int(config["titlefont"]["maxlines"]));
 
                 newslides.add_page(firstslide)
                 for page in Startingslides.pages[1:]:
                     newslides.add_page(page)
 
                 # Insert lecture slides
+                #TODO: make the lecture slides from the topics here?
                 Lectureslides = PdfReader(slide_updates[n]["file"])
                 for page in Lectureslides.pages:
                     newslides.add_page(page)
@@ -291,7 +309,7 @@ if __name__ == "__main__":
 
             # Check materials
             materials_for_all = load_full_directory(f"{config['settings']['slides_dir']}/{n:02}")
-            materials_forcourse = load_full_directory(f"{config[pub]['slides_dir']}/{n:02}")
+            materials_forcourse = load_full_directory(f"{pubObject.course_slides_dir}/{n:02}")
             materials_published = load_full_directory(matpubdir)
             if len(materials_for_all) + len(materials_forcourse) > 0:
                 for filename, file in materials_for_all.items():
