@@ -204,8 +204,20 @@ if __name__ == "__main__":
 
 	# Support for not all courses containing all lectures:
     #TODO: Make lecture object here? Or atleast rework the next line to work with the lecture objects.
+        try:
+            for x in range(1, pubObject.lectures+1):
+                lecturelist = config[pub][str(x)].split(",")
+                lecture_name = lecturelist.pop(0).strip()
+                pubObject.add_lecture(lecture_name, x, [topic.strip() for topic in lecturelist])
+        except KeyError:
+            print(f"Courses should be added as <lecturenumber = name, topic1, topic2 ... topicN> under publication {pubObject.name} in settings.ini")
+            continue
+        #old code:
+        """
         lectures = {int(x.strip()) for x in config[pub]["lectures"].split(",")}
         lecturenumber = 1
+        """
+        
 
         # Load header/footer slides
         Startingslides = PdfReader(Path(pubObject.course_slides_dir) / config["settings"]["headerfile"])
