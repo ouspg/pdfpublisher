@@ -251,25 +251,25 @@ if __name__ == "__main__":
                 continue
 
             # Check if the publication folder exists, create if necessary, check published file
-            matpubdir = f"{courseObject.publication_dir}/{courseObject.lectureterm} {lecturenumber:02}"
+            matpubdir = f"{courseObject.publication_dir}/{courseObject.lectureterm} {n:02}"
             matpubpath = Path(matpubdir)
             if not matpubpath.exists():
                 matpubpath.mkdir(parents=True, exist_ok=True)
-            filename = re.sub(r'[\\/]', '', f"{lecturenumber:02} - {courseObject.filename_prefix} {courseObject.lectureterm.lower()} {lecturenumber} – {config['settings'][str(n)]}.pdf")[:200]
+            filename = re.sub(r'[\\/]', '', f"{n:02} - {courseObject.filename_prefix} {courseObject.lectureterm.lower()} {n} – {config['settings'][str(n)]}.pdf")[:200]
             published_slides = matpubpath / filename
 
             # First check the slides, later additional materials
             if not n in slide_updates:
-                print(f"Luentomateriaali {n} -> Luento {lecturenumber}: luentokalvot eivät vielä saatavilla")
+                print(f"Luentomateriaali {n} -> Luento {n}: luentokalvot eivät vielä saatavilla")
             elif not n in pubslides:
-                print(f"Luentomateriaali {n} -> Luento {lecturenumber}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
+                print(f"Luentomateriaali {n} -> Luento {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
             elif published_slides.exists() and slide_updates[n]["modtime"] <= published_slides.stat().st_mtime and pubslides[n]["modtime"] <= published_slides.stat().st_mtime:
-                print(f"Luentomateriaali {n} -> Luento {lecturenumber}: ajan tasalla")
+                print(f"Luentomateriaali {n} -> Luento {n}: ajan tasalla")
             else:
                 if not published_slides.exists():
-                    print(f"Luentomateriaali {n} -> Luento {lecturenumber}: ei vielä julkaistu -> julkaistaan")
+                    print(f"Luentomateriaali {n} -> Luento {n}: ei vielä julkaistu -> julkaistaan")
                 else:
-                    print(f"Luentomateriaali {n} -> Luento {lecturenumber} on päivitetty -> julkaistaan")
+                    print(f"Luentomateriaali {n} -> Luento {n} on päivitetty -> julkaistaan")
                 newslides = PdfWriter()
 
                 # Take starting slide, update course and lecture name
@@ -307,7 +307,7 @@ if __name__ == "__main__":
                     newslides.write(f)
 
             # Check materials
-            materials_for_all = load_full_directory(f"{config['settings']['slides_dir']}/{n:02}")
+            materials_for_all = load_full_directory(f"{config['settings']['lecture_slides_dir']}/{n:02}")
             materials_forcourse = load_full_directory(f"{courseObject.course_slides_dir}/{n:02}")
             materials_published = load_full_directory(matpubdir)
             if len(materials_for_all) + len(materials_forcourse) > 0:
@@ -329,5 +329,4 @@ if __name__ == "__main__":
                         shutil.copy2(file['file'], materials_published[filename]["file"])
                     else:
                         print(f"...Tiedosto {filename} on ajan tasalla")
-            lecturenumber += 1
 
