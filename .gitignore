@@ -1,4 +1,4 @@
 settings.ini
 Pub1/
 Slides/
-*.pyc
+__pycache__/
