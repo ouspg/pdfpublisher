@@ -206,7 +206,7 @@ if __name__ == "__main__":
 
 # TODO: check for errors in class implementation
 
-    slide_updates = load_directory(config['settings']['slides_dir'])
+    slide_updates = load_directory(config['settings']['lecture_slides_dir'])
 
     for pub in publications:
         print(f"Tarkistetaan {config[pub]['coursename']}")
