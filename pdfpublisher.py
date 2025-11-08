@@ -21,7 +21,7 @@ FOOTER_FILE = "footer"
 
 # Required mandatory configurations
 REQUIRED_SETTINGS = {
-    "settings": ["lecture_slides_dir","headerfile","footerfile","dividerfile","lecturecount"],
+    "settings": ["lecture_slides_dir","headerfile","footerfile","dividerfile"],
     "titlefont": ["font","font_max_size","font_min_size","colour","maxlines"],
 }
 
@@ -243,7 +243,6 @@ if __name__ == "__main__":
         Endingslides = PdfReader(Path(courseObject.course_slides_dir) / config["settings"]["footerfile"])
 
         # Go through all or a subset of lectures
-        #TODO: rework this to account for oob and Settings.ini changes?
         for n in range(1, courseObject.lectures+1):
             #If not included in this publication, continue
             if n not in [lecture.lectureNumber for lecture in courseObject.lecture_list]:
@@ -256,59 +255,61 @@ if __name__ == "__main__":
             matpubpath = Path(matpubdir)
             if not matpubpath.exists():
                 matpubpath.mkdir(parents=True, exist_ok=True)
-            filename = re.sub(r'[\\/]', '', f"{n:02} - {courseObject.filename_prefix} {courseObject.lectureterm.lower()} {n} – {config['settings'][str(n)]}.pdf")[:200]
-            filename = re.sub(r'[\\/]', '', f"{n:02} - {courseObject.filename_prefix} {courseObject.lectureterm.lower()} {n} – {config['settings'][str(n)]}.pdf")[:200]
+            filename = re.sub(r'[\\/]', '', f"{n:02} - {courseObject.filename_prefix} {courseObject.lectureterm.lower()} {n} – {courseObject.lecture_list[n-1].name}.pdf")[:200]
             published_slides = matpubpath / filename
 
             # First check the slides, later additional materials
-            
+            updateFlag = False
             for topic in courseObject.lecture_list[n-1].topic_list:
+                topic = f"{topic}.pdf"
                 if not topic in slide_updates:
                     print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot eivät vielä saatavilla")
-                elif not n in pubslides:
-                    print(f"Luentomateriaali {n} -> Luento {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
                 elif published_slides.exists() and slide_updates[topic]["modtime"] <= published_slides.stat().st_mtime and pubslides[n]["modtime"] <= published_slides.stat().st_mtime:
-                    print(f"Luentomateriaali {n} -> Luento {n}: ajan tasalla")
+                    print(f"Luentomateriaali {n} -> Aihe {topic}: ajan tasalla")
                 else:
-                    if not published_slides.exists():
-                        print(f"Luentomateriaali {n} -> Luento {n}: ei vielä julkaistu -> julkaistaan")
-                    else:
-                        print(f"Luentomateriaali {n} -> Luento {n} on päivitetty -> julkaistaan")
-                    newslides = PdfWriter()
+                    print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot päivitetty -> julkaistaan")
+                    updateFlag = True
+            if not n in pubslides:
+                print(f"Luentomateriaali {n} -> Luento {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
+            elif updateFlag:
+                if not published_slides.exists():
+                    print(f"Luentomateriaali {n} -> Luento {n}: ei vielä julkaistu -> julkaistaan")
+                else:
+                    print(f"Luentomateriaali {n} -> Luento {n} on päivitetty -> julkaistaan")
+                newslides = PdfWriter()
 
                     # Take starting slide, update course and lecture name
-                    firstslide = Startingslides.pages[0]
-                    add_title(firstslide,courseObject.lectureterm,n,config["settings"][str(n)],config["titlefont"]["font"],int(config["titlefont"]["font_max_size"]),int(config["titlefont"]["font_max_size"]),config["titlefont"]["colour"],int(config["titlefont"]["maxlines"]));
+                firstslide = Startingslides.pages[0]
+                add_title(firstslide,courseObject.lectureterm,n,courseObject.lecture_list[n-1].name,config["titlefont"]["font"],int(config["titlefont"]["font_max_size"]),int(config["titlefont"]["font_max_size"]),config["titlefont"]["colour"],int(config["titlefont"]["maxlines"]));
 
-                    newslides.add_page(firstslide)
-                    for page in Startingslides.pages[1:]:
-                        newslides.add_page(page)
+                newslides.add_page(firstslide)
+                for page in Startingslides.pages[1:]:
+                    newslides.add_page(page)
 
-                    # Insert lecture slides
-                    #TODO: make the lecture slides from the topics here?
-                    #for topic in [lecture.topic_list for lecture in courseObject.lecture_list]:
-                    Lectureslides = PdfReader(slide_updates[topic]["file"])
+                # make lecture slides from topics
+                for topic in courseObject.lecture_list[n-1].topic_list:
+                    Lectureslides = PdfReader(slide_updates[f"{topic}.pdf"]["file"])
                     for page in Lectureslides.pages:
                         newslides.add_page(page)
 
-            # Insert divider slides
-                    for page in Dividerslides.pages:
-                        newslides.add_page(page)
+                 # Insert divider slides
+                for page in Dividerslides.pages:
+                    newslides.add_page(page)
 
-                    # Insert course-specific slides into the placeholder
-                    Courseslides = PdfReader(pubslides[n]["file"])
-                    for page in Courseslides.pages:
-                        newslides.add_page(page)
+                # Insert course-specific slides into the placeholder
+                Courseslides = PdfReader(pubslides[n]["file"])
+                for page in Courseslides.pages:
+                    newslides.add_page(page)
 
-            # Insert footer slides
-                    for page in Endingslides.pages:
-                        newslides.add_page(page)
+                # Insert footer slides
+                for page in Endingslides.pages:
+                    newslides.add_page(page)
 
-            # Write to file
-                    print("Luodaan pdf...")
-                    filename = re.sub(r'[\\/]', '', f"{n:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {n}: {config['settings'][str(n)]}.pdf")[:200]
-                    with open(published_slides,"wb") as f:
-                        newslides.write(f)
+                # Write to file
+                print("Luodaan pdf...")
+                filename = re.sub(r'[\\/]', '', f"{n:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {n}: {courseObject.lecture_list[n-1].name}.pdf")[:200]
+                with open(published_slides,"wb") as f:
+                    newslides.write(f)
 
             # Check materials
             materials_for_all = load_full_directory(f"{config['settings']['lecture_slides_dir']}/{n:02}")
