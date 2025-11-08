@@ -306,7 +306,7 @@ if __name__ == "__main__":
 
             # Write to file
                     print("Luodaan pdf...")
-                    #filename = re.sub(r'[\\/]', '', f"{lecturenumber:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {lecturenumber}: {config['settings'][str(n)]}.pdf")[:200]
+                    filename = re.sub(r'[\\/]', '', f"{n:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {n}: {config['settings'][str(n)]}.pdf")[:200]
                     with open(published_slides,"wb") as f:
                         newslides.write(f)
 
