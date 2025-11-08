@@ -21,7 +21,7 @@ FOOTER_FILE = "footer"
 
 # Required mandatory configurations
 REQUIRED_SETTINGS = {
-    "settings": ["lecture_slides_dir","headerfile","footerfile","dividerfile","lecturecount"],
+    "settings": ["lecture_slides_dir","headerfile","footerfile","dividerfile"],
     "titlefont": ["font","font_max_size","font_min_size","colour","maxlines"],
 }
 
@@ -256,18 +256,23 @@ if __name__ == "__main__":
             matpubpath = Path(matpubdir)
             if not matpubpath.exists():
                 matpubpath.mkdir(parents=True, exist_ok=True)
-            filename = re.sub(r'[\\/]', '', f"{n:02} - {courseObject.filename_prefix} {courseObject.lectureterm.lower()} {n} – {config['settings'][str(n)]}.pdf")[:200]
+            filename = re.sub(r'[\\/]', '', f"{n:02} - {courseObject.filename_prefix} {courseObject.lectureterm.lower()} {n} – {courseObject.lecture_list[n-1].name}.pdf")[:200]
             published_slides = matpubpath / filename
 
             # First check the slides, later additional materials
+            updateFlag = False
             for topic in courseObject.lecture_list[n-1].topic_list:
+                topic = f"{topic}.pdf"
                 if not topic in slide_updates:
                     print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot eivät vielä saatavilla")
                 elif published_slides.exists() and slide_updates[topic]["modtime"] <= published_slides.stat().st_mtime and pubslides[n]["modtime"] <= published_slides.stat().st_mtime:
                     print(f"Luentomateriaali {n} -> Aihe {topic}: ajan tasalla")
+                else:
+                    print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot päivitetty -> julkaistaan")
+                    updateFlag = True
             if not n in pubslides:
                 print(f"Luentomateriaali {n} -> Luento {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
-            else:
+            elif updateFlag:
                 if not published_slides.exists():
                     print(f"Luentomateriaali {n} -> Luento {n}: ei vielä julkaistu -> julkaistaan")
                 else:
@@ -276,15 +281,15 @@ if __name__ == "__main__":
 
                     # Take starting slide, update course and lecture name
                 firstslide = Startingslides.pages[0]
-                add_title(firstslide,courseObject.lectureterm,n,config["settings"][str(n)],config["titlefont"]["font"],int(config["titlefont"]["font_max_size"]),int(config["titlefont"]["font_max_size"]),config["titlefont"]["colour"],int(config["titlefont"]["maxlines"]));
+                add_title(firstslide,courseObject.lectureterm,n,courseObject.lecture_list[n-1].name,config["titlefont"]["font"],int(config["titlefont"]["font_max_size"]),int(config["titlefont"]["font_max_size"]),config["titlefont"]["colour"],int(config["titlefont"]["maxlines"]));
 
                 newslides.add_page(firstslide)
                 for page in Startingslides.pages[1:]:
                     newslides.add_page(page)
 
                 # make lecture slides from topics
-                for topic in [lecture.topic_list for lecture in courseObject.lecture_list]:
-                    Lectureslides = PdfReader(slide_updates[topic]["file"])
+                for topic in courseObject.lecture_list[n-1].topic_list:
+                    Lectureslides = PdfReader(slide_updates[f"{topic}.pdf"]["file"])
                     for page in Lectureslides.pages:
                         newslides.add_page(page)
 
@@ -303,7 +308,7 @@ if __name__ == "__main__":
 
                 # Write to file
                 print("Luodaan pdf...")
-                filename = re.sub(r'[\\/]', '', f"{n:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {n}: {config['settings'][str(n)]}.pdf")[:200]
+                filename = re.sub(r'[\\/]', '', f"{n:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {n}: {courseObject.lecture_list[n-1].name}.pdf")[:200]
                 with open(published_slides,"wb") as f:
                     newslides.write(f)
 
