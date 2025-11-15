@@ -52,6 +52,9 @@ def load_config():
     except configparser.DuplicateOptionError as e:
         print("[ERROR] duplicate option found in settings.ini:", e.option)
         sys.exit(1)
+    except configparser.ParsingError as e:
+        print("[ERROR] parsing error in settings.ini:", e)
+        sys.exit(1)
     modified = False
     missing = []
     publications = []
