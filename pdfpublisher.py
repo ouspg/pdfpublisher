@@ -204,8 +204,6 @@ if __name__ == "__main__":
     (config, publications) = load_config()
     print("Config loaded successfully!")
 
-# TODO: check for errors in class implementation
-
     slide_updates = load_directory(config['settings']['lecture_slides_dir'])
 
     for pub in publications:
@@ -223,7 +221,6 @@ if __name__ == "__main__":
         pubslides = load_directory(courseObject.course_slides_dir)
 
 	# Support for not all courses containing all lectures:
-    #TODO: Make lecture object here? Or atleast rework the next line to work with the lecture objects.
         try:
             for x in range(1, courseObject.lectures+1):
                 lecturelist = config[pub][str(x)].split(",")
@@ -232,12 +229,6 @@ if __name__ == "__main__":
         except KeyError:
             print(f"Courses should be added as <lecturenumber = name, topic1, topic2 ... topicN> under publication {courseObject.name} in settings.ini")
             continue
-        #old code:
-        """
-        lectures = {int(x.strip()) for x in config[pub]["lectures"].split(",")}
-        lecturenumber = 1
-        """
-        
 
         # Load header/footer slides
         Startingslides = PdfReader(Path(courseObject.course_slides_dir) / config["settings"]["headerfile"])
@@ -335,5 +326,3 @@ if __name__ == "__main__":
                         shutil.copy2(file['file'], materials_published[filename]["file"])
                     else:
                         print(f"...Tiedosto {filename} on ajan tasalla")
-            #lecturenumber += 1
-
