@@ -10,7 +10,7 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.lib import colors
 
-from classes import Course, Lecture
+from classes import Course
 
 #############################################################################
 # CONFIGURATION
@@ -200,6 +200,7 @@ def create_course_object(config, pub):
 #############################################################################
 # MAIN
 #############################################################################
+
 if __name__ == "__main__":
     (config, publications) = load_config()
     print("Config loaded successfully!")
