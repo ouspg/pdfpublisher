@@ -49,6 +49,9 @@ def load_config():
     except configparser.DuplicateSectionError as e:
         print("[ERROR] duplicate section found in settings.ini:", e.section)
         sys.exit(1)
+    except configparser.DuplicateOptionError as e:
+        print("[ERROR] duplicate option found in settings.ini:", e.option)
+        sys.exit(1)
     modified = False
     missing = []
     publications = []
