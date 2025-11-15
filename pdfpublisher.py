@@ -10,7 +10,7 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.lib import colors
 
-from classes import Course, Lecture
+from classes import Course
 
 #############################################################################
 # CONFIGURATION
@@ -39,12 +39,16 @@ def load_config():
     config = configparser.ConfigParser()
 
     # Read existing file (if any)
-    if CONFIG_FILE.exists():
-        config.read(CONFIG_FILE)
-    else:
-        print(f"[ERROR] Config file not found. Creating new {CONFIG_FILE}.")
-        CONFIG_FILE.touch()
+    try:
+        if CONFIG_FILE.exists():
+            config.read(CONFIG_FILE)
+        else:
+            print(f"[ERROR] Config file not found. Creating new {CONFIG_FILE}.")
+            CONFIG_FILE.touch()
 
+    except configparser.DuplicateSectionError as e:
+        print("[ERROR] duplicate section found in config file:")
+        sys.exit(1)
     modified = False
     missing = []
     publications = []
