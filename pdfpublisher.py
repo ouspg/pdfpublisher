@@ -47,7 +47,7 @@ def load_config():
             CONFIG_FILE.touch()
 
     except configparser.DuplicateSectionError as e:
-        print("[ERROR] duplicate section found in config file:")
+        print("[ERROR] duplicate section found in settings.ini:", e.section)
         sys.exit(1)
     modified = False
     missing = []
