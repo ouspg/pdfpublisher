@@ -39,12 +39,16 @@ def load_config():
     config = configparser.ConfigParser()
 
     # Read existing file (if any)
-    if CONFIG_FILE.exists():
-        config.read(CONFIG_FILE)
-    else:
-        print(f"[ERROR] Config file not found. Creating new {CONFIG_FILE}.")
-        CONFIG_FILE.touch()
+    try:
+        if CONFIG_FILE.exists():
+            config.read(CONFIG_FILE)
+        else:
+            print(f"[ERROR] Config file not found. Creating new {CONFIG_FILE}.")
+            CONFIG_FILE.touch()
 
+    except configparser.DuplicateSectionError as e:
+        print("[ERROR] duplicate section found in config file:")
+        sys.exit(1)
     modified = False
     missing = []
     publications = []
