@@ -10,7 +10,7 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.lib import colors
 
-from index import Course, Lecture
+from classes import Course, Lecture
 
 #############################################################################
 # CONFIGURATION
