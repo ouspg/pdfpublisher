@@ -1,4 +1,5 @@
 import configparser
+from copy import deepcopy
 import sys
 import re
 import io
@@ -50,11 +51,11 @@ def load_config():
     except configparser.DuplicateSectionError as e:
         print("[ERROR] duplicate section found in settings.ini:", e.section)
         sys.exit(1)
-    except configparser.DuplicateOptionError as e:
-        print("[ERROR] duplicate option found in settings.ini:", e.option)
-        sys.exit(1)
     except configparser.ParsingError as e:
         print("[ERROR] parsing error in settings.ini:", e)
+        sys.exit(1)
+    except configparser.DuplicateOptionError as e:
+        print("[ERROR] duplicate option found in settings.ini under section:", e.section, "option:", e.option)
         sys.exit(1)
     modified = False
     missing = []
@@ -284,7 +285,7 @@ if __name__ == "__main__":
                 newslides = PdfWriter()
 
                     # Take starting slide, update course and lecture name
-                firstslide = Startingslides.pages[0]
+                firstslide = deepcopy(Startingslides.pages[0])
                 add_title(firstslide,courseObject.lectureterm,n,courseObject.lecture_list[n-1].name,config["titlefont"]["font"],int(config["titlefont"]["font_max_size"]),int(config["titlefont"]["font_max_size"]),config["titlefont"]["colour"],int(config["titlefont"]["maxlines"]));
 
                 newslides.add_page(firstslide)
