@@ -72,10 +72,12 @@ def test_link(links: Iterable[Dict]) -> Tuple[List[Dict], List[Dict]]:
 
     return dead_links, alive_links
 
+
 def run_health_check(file: str):
     links = find_links(file)
     dead, alive = test_link(links)
     return dead, alive
+
 
 if __name__ == "__main__":
     # Test the link checker

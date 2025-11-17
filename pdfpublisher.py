@@ -341,3 +341,17 @@ if __name__ == "__main__":
                         shutil.copy2(file['file'], materials_published[filename]["file"])
                     else:
                         print(f"...Tiedosto {filename} on ajan tasalla")
+
+            # Run health check for links
+            print("Tarkistetaan linkit...")
+            for path in materials_published.values():
+                file = str(path["file"])
+                
+            dead, alive = run_health_check(materials_published)
+            
+            if not dead:
+                print("Kaikki linkit toimivat!")
+            else:
+                print("Seuraavat linkit eivät toimi:")
+                for link in dead:
+                    print(f"{link.get("file")} (sivu {link.get("page_number")}): {link.get("url")}")
