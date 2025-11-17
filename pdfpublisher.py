@@ -252,6 +252,7 @@ if __name__ == "__main__":
 
             # Check if the publication folder exists, create if necessary, check published file
             matpubdir = f"{courseObject.publication_dir}/{courseObject.lectureterm} {n:02}"
+            matpubdir = f"{courseObject.publication_dir}/{courseObject.lectureterm} {n:02}"
             matpubpath = Path(matpubdir)
             if not matpubpath.exists():
                 matpubpath.mkdir(parents=True, exist_ok=True)
@@ -312,6 +313,7 @@ if __name__ == "__main__":
                     newslides.write(f)
 
             # Check materials
+            materials_for_all = load_full_directory(f"{config['settings']['lecture_slides_dir']}/{n:02}")
             materials_for_all = load_full_directory(f"{config['settings']['lecture_slides_dir']}/{n:02}")
             materials_forcourse = load_full_directory(f"{courseObject.course_slides_dir}/{n:02}")
             materials_published = load_full_directory(matpubdir)
