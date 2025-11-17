@@ -4,6 +4,7 @@ import sys
 import re
 import io
 import shutil
+from utils import *
 from pathlib import Path
 from pypdf import PdfReader, PdfWriter
 from pypdf._page import PageObject
@@ -49,6 +50,9 @@ def load_config():
 
     except configparser.DuplicateSectionError as e:
         print("[ERROR] duplicate section found in settings.ini:", e.section)
+        sys.exit(1)
+    except configparser.ParsingError as e:
+        print("[ERROR] parsing error in settings.ini:", e)
         sys.exit(1)
     except configparser.DuplicateOptionError as e:
         print("[ERROR] duplicate option found in settings.ini under section:", e.section, "option:", e.option)
@@ -208,6 +212,7 @@ def create_course_object(config, pub):
 #############################################################################
 # MAIN
 #############################################################################
+
 if __name__ == "__main__":
     (config, publications) = load_config()
     print("Config loaded successfully!")
@@ -336,3 +341,17 @@ if __name__ == "__main__":
                         shutil.copy2(file['file'], materials_published[filename]["file"])
                     else:
                         print(f"...Tiedosto {filename} on ajan tasalla")
+
+            # Run health check for links
+            print("Tarkistetaan linkit...")
+            for path in materials_published.values():
+                file = str(path["file"])
+                
+            dead, alive = run_health_check(materials_published)
+            
+            if not dead:
+                print("Kaikki linkit toimivat!")
+            else:
+                print("Seuraavat linkit eivät toimi:")
+                for link in dead:
+                    print(f"{link.get("file")} (sivu {link.get("page_number")}): {link.get("url")}")

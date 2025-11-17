@@ -15,13 +15,6 @@ class Course:
             Lecture(name, lectureNumber, list)
         )
 
-"""
-        if isinstance(lecture, Lecture):
-            self.lecture_list.append(lecture)
-        else:
-            raise TypeError("You can only add Lecture objects.")
-"""
-
 class Lecture():
     def __init__(self, name: str, lectureNumber: int, topic_list: list):
         self.name = name
