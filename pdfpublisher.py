@@ -1,4 +1,5 @@
 import configparser
+import argparse
 from copy import deepcopy
 import sys
 import re
@@ -216,8 +217,41 @@ def create_course_object(config, pub):
 if __name__ == "__main__":
     (config, publications) = load_config()
     print("Config loaded successfully!")
-
+    parser = argparse.ArgumentParser(description="PDF Publisher for Lecture Materials")
+    parser.add_argument("--linkcheck", action="store_true", help="Run link health check")
+    args = parser.parse_args()
+    
     slide_updates = load_directory(config['settings']['lecture_slides_dir'])
+    if args.linkcheck:
+        print("Tarkistetaan linkit")
+        for pub in publications:
+            courseObject = Course(config[pub]['coursecode'],
+                                int(config[pub]['coursesize']),
+                                int(config[pub]['lectures']),
+                                config[pub]['coursename'],
+                                config[pub]['filename_prefix'],
+                                config[pub]['lectureterm'],
+                                config[pub]['publish_dir'],
+                                config[pub]['course_slides_dir'])
+            for n in range(1, courseObject.lectures + 1):
+                matpubdir = f"{courseObject.publication_dir}/{courseObject.lectureterm} {n:02}"
+                matpubpath = Path(matpubdir)
+                if not matpubpath.exists():
+                    print(f"Skipping {matpubdir}: not found")
+                    continue
+                print(f"Checking links in {matpubdir} ...")
+                materials_published = load_full_directory(matpubdir)
+                dead, alive = run_health_check(materials_published)
+                if not dead:
+                    print(f"{matpubdir}: Kaikki linkit toimivat!")
+                else:
+                    print(f"{matpubdir}: Seuraavat linkit eivät toimi:")
+                    for link in dead:
+                        print(f"{link.get('file')} (sivu {link.get('page_number')}): {link.get('url')}")
+        sys.exit(0)
+
+        #Load publication-specific update dates
+        pubslides = load_directory(courseObject.course_slides_dir)
 
     for pub in publications:
         print(f"Tarkistetaan {config[pub]['coursename']}")
@@ -344,17 +378,14 @@ if __name__ == "__main__":
 
             # Run health check for links
             print("Tarkistetaan linkit...")
-            files = []
+            for path in materials_published.values():
+                file = str(path["file"])
+                
+            dead, alive = run_health_check(materials_published)
             
-            for v in materials_published.values():
-                files.append(v.get("file")._raw_paths[0])
-            for file in files:
-                print(file)
-                dead, alive = run_health_check(file)
-
-                if not dead:
-                    print(f"Tiedoston {file} kaikki linkit toimivat oikein.")
-                else:
-                    print("Seuraavat linkit eivät toimi:")
-                    for link in dead:
-                        print(f"{link.get("file")} (sivu {link.get("page_number")}): {link.get("url")}")
+            if not dead:
+                print("Kaikki linkit toimivat!")
+            else:
+                print("Seuraavat linkit eivät toimi:")
+                for link in dead:
+                    print(f"{link.get("file")} (sivu {link.get("page_number")}): {link.get("url")}")
