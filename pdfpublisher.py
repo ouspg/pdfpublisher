@@ -222,6 +222,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     slide_updates = load_directory(config['settings']['lecture_slides_dir'])
+
+    #############################################################################
+    # Link checking
+    #############################################################################
     if args.linkcheck:
         print("Tarkistetaan linkit")
         for pub in publications:
@@ -239,19 +243,24 @@ if __name__ == "__main__":
                 if not matpubpath.exists():
                     print(f"Skipping {matpubdir}: not found")
                     continue
-                print(f"Checking links in {matpubdir} ...")
                 materials_published = load_full_directory(matpubdir)
-                dead, alive = run_health_check(materials_published)
-                if not dead:
-                    print(f"{matpubdir}: Kaikki linkit toimivat!")
-                else:
-                    print(f"{matpubdir}: Seuraavat linkit eivät toimi:")
-                    for link in dead:
-                        print(f"{link.get('file')} (sivu {link.get('page_number')}): {link.get('url')}")
+                # Run health check for links
+                files = []
+                
+                for v in materials_published.values():
+                    files.append(v.get("file"))
+
+                for file in files:
+                    dead, alive = run_health_check(file._raw_paths[0])
+
+                    if dead:
+                        print("Seuraavat linkit eivät toimi:")
+                        for link in dead:
+                            print(f"{link.get('file')} (sivu {link.get('page_number')}): {link.get('url')}")  
+                    else:
+                        print(f"Tiedoston {file.name} kaikki linkit toimivat oikein.")
         sys.exit(0)
 
-        #Load publication-specific update dates
-        pubslides = load_directory(courseObject.course_slides_dir)
 
     for pub in publications:
         print(f"Tarkistetaan {config[pub]['coursename']}")
@@ -373,20 +382,3 @@ if __name__ == "__main__":
                         shutil.copy2(file['file'], materials_published[filename]["file"])
                     else:
                         print(f"...Tiedosto {filename} on ajan tasalla")
-
-            # Run health check for links
-            print("Tarkistetaan linkit...")
-            files = []
-            
-            for v in materials_published.values():
-                files.append(v.get("file")._raw_paths[0])
-            for file in files:
-                print(file)
-                dead, alive = run_health_check(file)
-
-                if not dead:
-                    print(f"Tiedoston {file} kaikki linkit toimivat oikein.")
-                else:
-                    print("Seuraavat linkit eivät toimi:")
-                    for link in dead:
-                        print(f"{link.get("file")} (sivu {link.get("page_number")}): {link.get("url")}")
