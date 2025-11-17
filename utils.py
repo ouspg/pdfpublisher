@@ -62,9 +62,11 @@ def test_link(links: Iterable[Dict]) -> Tuple[List[Dict], List[Dict]]:
             continue
         seen.add(key)
         try:
-            resp = requests.head(url, allow_redirects=True, timeout=5)
-            if resp.status_code >= 400:
+            resp = requests.get(url, allow_redirects=True, timeout=5, auth=None, headers={'User-Agent': 'Mozilla/5.0'})
+            if resp.status_code >= 500 or resp.status_code == 404:
                 dead_links.append(item)
+            elif resp.status_code >= 400:
+                continue
             else:
                 alive_links.append(item)
         except requests.RequestException:
