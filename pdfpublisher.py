@@ -1,4 +1,5 @@
 import configparser
+from copy import deepcopy
 import sys
 import re
 import io
@@ -278,7 +279,7 @@ if __name__ == "__main__":
                 newslides = PdfWriter()
 
                     # Take starting slide, update course and lecture name
-                firstslide = Startingslides.pages[0]
+                firstslide = deepcopy(Startingslides.pages[0])
                 add_title(firstslide,courseObject.lectureterm,n,courseObject.lecture_list[n-1].name,config["titlefont"]["font"],int(config["titlefont"]["font_max_size"]),int(config["titlefont"]["font_max_size"]),config["titlefont"]["colour"],int(config["titlefont"]["maxlines"]));
 
                 newslides.add_page(firstslide)
