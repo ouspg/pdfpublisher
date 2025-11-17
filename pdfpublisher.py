@@ -3,6 +3,7 @@ import sys
 import re
 import io
 import shutil
+from utils import *
 from pathlib import Path
 from pypdf import PdfReader, PdfWriter
 from pypdf._page import PageObject
