@@ -191,24 +191,45 @@ def load_full_directory(directory):
     return files
 
 def create_course_object(config, pub):
-    course_code = config[pub]["coursecode"]
-    course_size = config[pub]["coursesize"]
-    name = config[pub]["coursename"]
-    filename_prefix = config[pub]["filename_prefix"]
-    lectures = config[pub]["lectures"]
-    lecture_term = config[pub]["lectureterm"]
-    publication_dir = config[pub]["publish_dir"]
-    course_dir = config[pub]["course_slides_dir"]
+    courseObject = Course(config[pub]['coursecode'],
+                            int(config[pub]['coursesize']),
+                            int(config[pub]['lectures']),
+                            config[pub]['coursename'],
+                            config[pub]['filename_prefix'],
+                            config[pub]['lectureterm'],
+                            config[pub]['publish_dir'],
+                            config[pub]['course_slides_dir'])
 
-    return Course(course_code,
-                    int(course_size),
-                    lectures,
-                    name,
-                    filename_prefix,
-                    lecture_term,
-                    publication_dir,
-                    course_dir
-            )
+    return courseObject
+
+def link_health_check(config, pub):
+    print("Tarkistetaan linkit")
+    for pub in publications:
+        courseObject = create_course_object(config, pub)
+        print(f"Tarkistetaan kurssi {courseObject.name}")
+        for n in range(1, courseObject.lectures + 1):
+            matpubdir = f"{courseObject.publication_dir}/{courseObject.lectureterm} {n:02}"
+            matpubpath = Path(matpubdir)
+            if not matpubpath.exists():
+                print(f"Skipping {matpubdir}: not found")
+                continue
+            materials_published = load_full_directory(matpubdir)
+            # Run health check for links
+            files = []
+            
+            for v in materials_published.values():
+                files.append(v.get("file"))
+
+            for file in files:
+                dead, alive = run_health_check(file._raw_paths[0])
+
+                if dead:
+                    print("Seuraavat linkit eivät toimi:")
+                    for link in dead:
+                        print(f"{link.get('file')} (sivu {link.get('page_number')}): {link.get('url')}")  
+                else:
+                    print(f"Tiedoston {file.name} kaikki linkit toimivat oikein.")
+    sys.exit(0)
 
 #############################################################################
 # MAIN
@@ -217,61 +238,21 @@ def create_course_object(config, pub):
 if __name__ == "__main__":
     (config, publications) = load_config()
     print("Config loaded successfully!")
+
     parser = argparse.ArgumentParser(description="PDF Publisher for Lecture Materials")
-    parser.add_argument("--linkcheck", action="store_true", help="Run link health check")
+    parser.add_argument("--linkcheck", "-l", action="store_true", help="Run link health check")
     args = parser.parse_args()
     
     slide_updates = load_directory(config['settings']['lecture_slides_dir'])
 
-    #############################################################################
-    # Link checking
-    #############################################################################
+    #link health check
     if args.linkcheck:
-        print("Tarkistetaan linkit")
-        for pub in publications:
-            courseObject = Course(config[pub]['coursecode'],
-                                int(config[pub]['coursesize']),
-                                int(config[pub]['lectures']),
-                                config[pub]['coursename'],
-                                config[pub]['filename_prefix'],
-                                config[pub]['lectureterm'],
-                                config[pub]['publish_dir'],
-                                config[pub]['course_slides_dir'])
-            for n in range(1, courseObject.lectures + 1):
-                matpubdir = f"{courseObject.publication_dir}/{courseObject.lectureterm} {n:02}"
-                matpubpath = Path(matpubdir)
-                if not matpubpath.exists():
-                    print(f"Skipping {matpubdir}: not found")
-                    continue
-                materials_published = load_full_directory(matpubdir)
-                # Run health check for links
-                files = []
-                
-                for v in materials_published.values():
-                    files.append(v.get("file"))
+        link_health_check(config, publications)
 
-                for file in files:
-                    dead, alive = run_health_check(file._raw_paths[0])
-
-                    if dead:
-                        print("Seuraavat linkit eivät toimi:")
-                        for link in dead:
-                            print(f"{link.get('file')} (sivu {link.get('page_number')}): {link.get('url')}")  
-                    else:
-                        print(f"Tiedoston {file.name} kaikki linkit toimivat oikein.")
-        sys.exit(0)
-
-
+    #Main program
     for pub in publications:
         print(f"Tarkistetaan {config[pub]['coursename']}")
-        courseObject = Course(config[pub]['coursecode'],
-                            int(config[pub]['coursesize']),
-                            int(config[pub]['lectures']),
-                            config[pub]['coursename'],
-                            config[pub]['filename_prefix'],
-                            config[pub]['lectureterm'],
-                            config[pub]['publish_dir'],
-                            config[pub]['course_slides_dir'])
+        courseObject = create_course_object(config, pub)
 
         #Load publication-specific update dates
         pubslides = load_directory(courseObject.course_slides_dir)
