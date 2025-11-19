@@ -289,10 +289,12 @@ if __name__ == "__main__":
 
             # First check the slides, later additional materials
             updateFlag = False
+            missingSlides = False
             for topic in courseObject.lecture_list[n-1].topic_list:
                 topic = f"{topic}.pdf"
                 if not topic in slide_updates:
                     print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot eivät vielä saatavilla")
+                    missingSlides = True
                 elif published_slides.exists() and slide_updates[topic]["modtime"] <= published_slides.stat().st_mtime and pubslides[n]["modtime"] <= published_slides.stat().st_mtime:
                     print(f"Luentomateriaali {n} -> Aihe {topic}: ajan tasalla")
                 else:
@@ -300,7 +302,7 @@ if __name__ == "__main__":
                     updateFlag = True
             if not n in pubslides:
                 print(f"Luentomateriaali {n} -> Luento {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
-            elif updateFlag:
+            elif updateFlag and not missingSlides:
                 if not published_slides.exists():
                     print(f"Luentomateriaali {n} -> Luento {n}: ei vielä julkaistu -> julkaistaan")
                 else:
