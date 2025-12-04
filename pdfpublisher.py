@@ -202,11 +202,12 @@ def create_course_object(config, pub):
 
     return courseObject
 
-def link_health_check(config, pub):
+def link_health_check(config, pub, silent):
     print("Tarkistetaan linkit")
     for pub in publications:
         courseObject = create_course_object(config, pub)
-        print(f"Tarkistetaan kurssi {courseObject.name}")
+        if not silent:
+            print(f"Tarkistetaan kurssi {courseObject.name}")
         for n in range(1, courseObject.lectures + 1):
             matpubdir = f"{courseObject.publication_dir}/{courseObject.lectureterm} {n:02}"
             matpubpath = Path(matpubdir)
@@ -228,7 +229,8 @@ def link_health_check(config, pub):
                     for link in dead:
                         print(f"{link.get('file')} (sivu {link.get('page_number')}): {link.get('url')}")  
                 else:
-                    print(f"Tiedoston {file.name} kaikki linkit toimivat oikein.")
+                    if not silent:
+                        print(f"Tiedoston {file.name} kaikki linkit toimivat oikein.")
     sys.exit(0)
 
 #############################################################################
@@ -241,13 +243,15 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="PDF Publisher for Lecture Materials")
     parser.add_argument("--linkcheck", "-l", action="store_true", help="Run link health check")
+    parser.add_argument("--silent", "-s", action="store_true", help="Silent mode, minimal output")
     args = parser.parse_args()
     
     slide_updates = load_directory(config['settings']['lecture_slides_dir'])
-
+    
     #link health check
     if args.linkcheck:
-        link_health_check(config, publications)
+        silent = args.silent
+        link_health_check(config, publications, silent)
 
     #Main program
     for pub in publications:
