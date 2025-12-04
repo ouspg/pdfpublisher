@@ -29,14 +29,14 @@ REQUIRED_SETTINGS = {
 }
 
 # Mandatory options for all publications
-PUBLICATION_OPTIONS = set(["coursename",
+PUBLICATION_OPTIONS = set(["coursecode",
+"publish_dir",
 "coursesize",
-"coursecode",
 "lectures",
-"lectureterm",
+"coursename",
 "filename_prefix",
-"course_slides_dir",
-"publish_dir"])
+"lectureterm",
+"course_slides_dir"])
 
 def load_config():
     config = configparser.ConfigParser()
