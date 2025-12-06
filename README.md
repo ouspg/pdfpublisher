@@ -32,5 +32,5 @@ You can check links on a specific file by specifying it via `--checkfile` or `-f
 
 The flag `--silent` or `-s` is also available to minimize prints.
 
-The dead links which the program finds are saved to a database, which can be externally viewed to see which links have returned which codes and when they have failed the test.
+The dead links the program finds are saved to a database, which can be externally viewed to see which links have returned which codes and when they have failed the test.
 

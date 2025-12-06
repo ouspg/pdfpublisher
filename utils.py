@@ -74,6 +74,7 @@ def test_link(links: Iterable[Dict]) -> Tuple[List[Dict], List[Dict]]:
             else:
                 alive_links.append(item)
         except requests.RequestException:
+            item.update({"error_code": "timeout"})
             dead_links.append(item)
 
     return dead_links, alive_links
@@ -88,7 +89,7 @@ def add_dead_links_to_db(cursor, file, dead_links):
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS dead_links (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        error_code INTEGER,
+        error_code TEXT,
         file TEXT,
         url TEXT,
         page_number INTEGER,
@@ -118,12 +119,3 @@ def run_health_check(file: str):
     links = find_links(file)
     dead, alive = test_link(links)
     return dead, alive
-
-
-if __name__ == "__main__":
-    # Test the link checker
-    file = "Test.pdf"
-    links = find_links(file)
-    dead, alive = test_link(links)
-    print(f"Dead links: {dead}")
-    print(f"Alive links: {alive}")
