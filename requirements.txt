@@ -1,4 +1,3 @@
 pypdf
 reportlab
 requests
-sqlite3

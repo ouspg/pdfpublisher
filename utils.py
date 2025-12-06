@@ -1,4 +1,6 @@
 import requests
+import sqlite3
+from datetime import datetime, timezone
 from typing import Set, Iterable, List, Tuple, Dict
 from pypdf import PdfReader
 
@@ -74,6 +76,39 @@ def test_link(links: Iterable[Dict]) -> Tuple[List[Dict], List[Dict]]:
 
     return dead_links, alive_links
 
+def connect_to_db():
+    conn = sqlite3.connect("link_health.db")
+    cur = conn.cursor()
+    cur.execute("PRAGMA foreign_keys = ON;")
+    return cur
+
+def add_dead_links_to_db(cursor, file, dead_links):
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS dead_links (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file TEXT,
+        url TEXT,
+        page_number INTEGER,
+        checked_at TEXT
+    )
+    """)
+
+    check_time = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H-%M-%S")
+    rows = []
+
+    for item in dead_links:
+        url = item.get("url")
+        if not url:
+            continue
+        page = item.get("page_number")
+        rows.append((file, url, page, check_time))
+
+    if rows:
+        cursor.executemany(
+            "INSERT INTO dead_links (file, url, page_number, checked_at) VALUES (?, ?, ?, ?)",
+            rows,
+        )
+        cursor.connection.commit()
 
 def run_health_check(file: str):
     links = find_links(file)

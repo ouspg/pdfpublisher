@@ -29,14 +29,14 @@ REQUIRED_SETTINGS = {
 }
 
 # Mandatory options for all publications
-PUBLICATION_OPTIONS = set(["coursename",
+PUBLICATION_OPTIONS = set(["coursecode",
+"publish_dir",
 "coursesize",
-"coursecode",
 "lectures",
-"lectureterm",
+"coursename",
 "filename_prefix",
-"course_slides_dir",
-"publish_dir"])
+"lectureterm",
+"course_slides_dir"])
 
 def load_config():
     config = configparser.ConfigParser()
@@ -225,6 +225,8 @@ def link_health_check(config, pub, silent):
                 dead, alive = run_health_check(file._raw_paths[0])
 
                 if dead:
+                    cur = connect_to_db()
+                    add_dead_links_to_db(cur, file._raw_paths[0], dead)
                     print("Seuraavat linkit eivät toimi:")
                     for link in dead:
                         print(f"{link.get('file')} (sivu {link.get('page_number')}): {link.get('url')}")  
