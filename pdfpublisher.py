@@ -203,7 +203,8 @@ def create_course_object(config, pub):
     return courseObject
 
 def link_health_check(config, pub, silent):
-    print("Tarkistetaan linkit")
+    if not silent:
+        print("Tarkistetaan linkit")
     for pub in publications:
         courseObject = create_course_object(config, pub)
         if not silent:
@@ -229,10 +230,24 @@ def link_health_check(config, pub, silent):
                     add_dead_links_to_db(cur, file._raw_paths[0], dead)
                     print("Seuraavat linkit eivät toimi:")
                     for link in dead:
-                        print(f"{link.get('file')} (sivu {link.get('page_number')}): {link.get('url')}")  
+                        print(f"{link.get('file')} (sivu {link.get('page_number')}): {link.get('url')} virhekoodi: {link.get('error_code')}")  
                 else:
                     if not silent:
                         print(f"Tiedoston {file.name} kaikki linkit toimivat oikein.")
+    sys.exit(0)
+
+
+def checkLinksOnFile(file, silent):
+    dead, alive = run_health_check(file)
+    if dead:
+        cur = connect_to_db()
+        add_dead_links_to_db(cur, file, dead)
+        print("Seuraavat linkit eivät toimi:")
+        for link in dead:
+            print(f"{link.get('file')} (sivu {link.get('page_number')}): {link.get('url')} virhekoodi: {link.get('error_code')}")  
+    else:
+        if not silent:
+            print(f"Tiedoston {file.name} kaikki linkit toimivat oikein.")
     sys.exit(0)
 
 #############################################################################
@@ -240,24 +255,33 @@ def link_health_check(config, pub, silent):
 #############################################################################
 
 if __name__ == "__main__":
-    (config, publications) = load_config()
-    print("Config loaded successfully!")
-
     parser = argparse.ArgumentParser(description="PDF Publisher for Lecture Materials")
     parser.add_argument("--linkcheck", "-l", action="store_true", help="Run link health check")
     parser.add_argument("--silent", "-s", action="store_true", help="Silent mode, minimal output")
+    parser.add_argument("--checkfile", "-f", type=str, help="Check links in a specific PDF file")
     args = parser.parse_args()
     
+    silent = args.silent
+
+    (config, publications) = load_config()
+    if not silent:
+        print("Config loaded successfully!")
+
     slide_updates = load_directory(config['settings']['lecture_slides_dir'])
+
+    if args.checkfile:
+        if not silent:
+            print("Tarkistetaan linkit tiedostosta:", args.checkfile)
+        checkLinksOnFile(args.checkfile, silent)
     
     #link health check
     if args.linkcheck:
-        silent = args.silent
         link_health_check(config, publications, silent)
 
     #Main program
     for pub in publications:
-        print(f"Tarkistetaan {config[pub]['coursename']}")
+        if not silent:
+            print(f"Tarkistetaan {config[pub]['coursename']}")
         courseObject = create_course_object(config, pub)
 
         #Load publication-specific update dates
@@ -302,17 +326,21 @@ if __name__ == "__main__":
                     print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot eivät vielä saatavilla")
                     missingSlides = True
                 elif published_slides.exists() and slide_updates[topic]["modtime"] <= published_slides.stat().st_mtime and pubslides[n]["modtime"] <= published_slides.stat().st_mtime:
-                    print(f"Luentomateriaali {n} -> Aihe {topic}: ajan tasalla")
+                    if not silent:
+                        print(f"Luentomateriaali {n} -> Aihe {topic}: ajan tasalla")
                 else:
-                    print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot päivitetty -> julkaistaan")
+                    if not silent:
+                        print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot päivitetty -> julkaistaan")
                     updateFlag = True
             if not n in pubslides:
                 print(f"Luentomateriaali {n} -> Luento {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
             elif updateFlag and not missingSlides:
                 if not published_slides.exists():
-                    print(f"Luentomateriaali {n} -> Luento {n}: ei vielä julkaistu -> julkaistaan")
+                    if not silent:
+                        print(f"Luentomateriaali {n} -> Luento {n}: ei vielä julkaistu -> julkaistaan")
                 else:
-                    print(f"Luentomateriaali {n} -> Luento {n} on päivitetty -> julkaistaan")
+                    if not silent:
+                        print(f"Luentomateriaali {n} -> Luento {n} on päivitetty -> julkaistaan")
                 newslides = PdfWriter()
 
                     # Take starting slide, update course and lecture name
@@ -343,7 +371,8 @@ if __name__ == "__main__":
                     newslides.add_page(page)
 
                 # Write to file
-                print("Luodaan pdf...")
+                if not silent:
+                    print("Luodaan pdf...")
                 filename = re.sub(r'[\\/]', '', f"{n:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {n}: {courseObject.lecture_list[n-1].name}.pdf")[:200]
                 with open(published_slides,"wb") as f:
                     newslides.write(f)
@@ -355,19 +384,25 @@ if __name__ == "__main__":
             if len(materials_for_all) + len(materials_forcourse) > 0:
                 for filename, file in materials_for_all.items():
                     if filename not in materials_published:
-                        print(f"...Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.")
+                        if not silent:
+                            print(f"...Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.")
                         shutil.copy2(file['file'], matpubpath / filename)
                     elif file["modtime"] > materials_published[filename]["modtime"]:
-                        print(f"...Tiedostosta {filename} on uudempi versio, julkaistaan.")
+                        if not silent:
+                            print(f"...Tiedostosta {filename} on uudempi versio, julkaistaan.")
                         shutil.copy2(file['file'], materials_published[filename]["file"])
                     else:
-                        print(f"...Tiedosto {filename} on ajan tasalla")
+                        if not silent:
+                            print(f"...Tiedosto {filename} on ajan tasalla")
                 for filename, file in materials_forcourse.items():
                     if filename not in materials_published:
-                        print(f"...Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.")
+                        if not silent:
+                            print(f"...Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.")
                         shutil.copy2(file['file'], matpubpath / filename)
                     elif file["modtime"] > materials_published[filename]["modtime"]:
-                        print(f"...Tiedostosta {filename} on uudempi versio, julkaistaan.")
+                        if not silent:
+                            print(f"...Tiedostosta {filename} on uudempi versio, julkaistaan.")
                         shutil.copy2(file['file'], materials_published[filename]["file"])
                     else:
-                        print(f"...Tiedosto {filename} on ajan tasalla")
+                        if not silent:
+                            print(f"...Tiedosto {filename} on ajan tasalla")

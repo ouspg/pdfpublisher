@@ -35,7 +35,7 @@ def find_links(file: str) -> List[Dict]:
                 continue
             if ank in u and uri in u[ank]:
                 url = u[ank][uri]
-                links.append({"url": url, "file": file, "page_number": page_index + 1})
+                links.append({"url": url, "file": file, "page_number": page_index + 1, "error_code": None})
     return links
 
 
@@ -66,8 +66,10 @@ def test_link(links: Iterable[Dict]) -> Tuple[List[Dict], List[Dict]]:
         try:
             resp = requests.get(url, allow_redirects=True, timeout=5, auth=None, headers={'User-Agent': 'Mozilla/5.0'})
             if resp.status_code >= 500 or resp.status_code == 404:
+                item.update({"error_code": resp.status_code})
                 dead_links.append(item)
             elif resp.status_code >= 400:
+                item.update({"error_code": resp.status_code})
                 continue
             else:
                 alive_links.append(item)
@@ -86,6 +88,7 @@ def add_dead_links_to_db(cursor, file, dead_links):
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS dead_links (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        error_code INTEGER,
         file TEXT,
         url TEXT,
         page_number INTEGER,
@@ -101,11 +104,12 @@ def add_dead_links_to_db(cursor, file, dead_links):
         if not url:
             continue
         page = item.get("page_number")
-        rows.append((file, url, page, check_time))
+        error_code = item.get("error_code")
+        rows.append((error_code, file, url, page, check_time))
 
     if rows:
         cursor.executemany(
-            "INSERT INTO dead_links (file, url, page_number, checked_at) VALUES (?, ?, ?, ?)",
+            "INSERT INTO dead_links (error_code, file, url, page_number, checked_at) VALUES (?, ?, ?, ?, ?)",
             rows,
         )
         cursor.connection.commit()

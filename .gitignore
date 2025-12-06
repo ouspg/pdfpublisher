@@ -4,3 +4,4 @@ Slides/
 __pycache__/
 pubDst/
 pubDst2/
+*.db
