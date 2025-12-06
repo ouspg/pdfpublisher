@@ -26,5 +26,9 @@ Fill these with what font, fontsize colour and maxlines you want to use
 
 ### Link health checking
 
-The program allows you to health check the links present in published slides. This is used by using the --linkcheck or -l flag. This prints out any links which no longer hold the linked resource or is not a working website at all.
+The program allows you to health check the links present in published slides. This is used by using the `--linkcheck` or `-l` flag. This prints out any links which no longer hold the linked resource or is not a working website at all.
+
+You can check links on a specific file by specifying it via `--checkfile` or `-f`. `-f <path to file>`
+
+The flag `--silent` or `-s` is also available to minimize prints.
 
