@@ -1,7 +1,3 @@
 settings.ini
-Pub1/
-Slides/
 __pycache__/
-pubDst/
-pubDst2/
 *.db
