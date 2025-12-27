@@ -192,7 +192,7 @@ def load_full_directory(directory):
 
 def create_course_object(config, pub):
     courseObject = Course(config[pub]['coursecode'],
-                            int(config[pub]['coursesize']),
+                            config[pub]['coursesize'],
                             int(config[pub]['lectures']),
                             config[pub]['coursename'],
                             config[pub]['filename_prefix'],
