@@ -290,7 +290,7 @@ if __name__ == "__main__":
 	# Support for not all courses containing all lectures:
         try:
             for x in range(1, courseObject.lectures+1):
-                lecturelist = config[pub][str(x)].split(",")
+                lecturelist = config[pub][str(x)].split(";")
                 lecture_name = lecturelist.pop(0).strip()
                 courseObject.add_lecture(lecture_name, x, [topic.strip() for topic in lecturelist])
         except KeyError:
