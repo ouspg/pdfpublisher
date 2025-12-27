@@ -329,14 +329,14 @@ if __name__ == "__main__":
                         print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot päivitetty -> julkaistaan")
                     updateFlag = True
             if not n in pubslides:
-                print(f"Luentomateriaali {n} -> Luento {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
+                print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
             elif updateFlag and not missingSlides:
                 if not published_slides.exists():
                     if not silent:
-                        print(f"Luentomateriaali {n} -> Luento {n}: ei vielä julkaistu -> julkaistaan")
+                        print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n}: ei vielä julkaistu -> julkaistaan")
                 else:
                     if not silent:
-                        print(f"Luentomateriaali {n} -> Luento {n} on päivitetty -> julkaistaan")
+                        print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n} on päivitetty -> julkaistaan")
                 newslides = PdfWriter()
 
                     # Take starting slide, update course and lecture name
