@@ -304,10 +304,6 @@ if __name__ == "__main__":
 
         # Go through all or a subset of lectures
         for n in range(1, courseObject.lectures+1):
-            #If not included in this publication, continue
-            if n not in [lecture.lectureNumber for lecture in courseObject.lecture_list]:
-                print(f"Luentomateriaali {n}: tämä luento ei sisälly tähän kurssiin.")
-                continue
 
             # Check if the publication folder exists, create if necessary, check published file
             matpubdir = f"{courseObject.publication_dir}/{courseObject.lectureterm} {n:02}"
