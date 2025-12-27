@@ -287,7 +287,7 @@ if __name__ == "__main__":
         #Load publication-specific update dates
         pubslides = load_directory(courseObject.course_slides_dir)
 
-	# Read the lecture names and topics from the configuration, error if not enough lecture definitions are found:
+        # Read the lecture names and topics from the configuration, error if not enough lecture definitions are found:
         try:
             for x in range(1, courseObject.lectures+1):
                 lecturelist = config[pub][str(x)].split(";")
