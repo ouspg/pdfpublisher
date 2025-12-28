@@ -192,7 +192,7 @@ def load_full_directory(directory):
 
 def create_course_object(config, pub):
     courseObject = Course(config[pub]['coursecode'],
-                            int(config[pub]['coursesize']),
+                            config[pub]['coursesize'],
                             int(config[pub]['lectures']),
                             config[pub]['coursename'],
                             config[pub]['filename_prefix'],
@@ -287,14 +287,14 @@ if __name__ == "__main__":
         #Load publication-specific update dates
         pubslides = load_directory(courseObject.course_slides_dir)
 
-	# Support for not all courses containing all lectures:
+        # Read the lecture names and topics from the configuration, error if not enough lecture definitions are found:
         try:
             for x in range(1, courseObject.lectures+1):
-                lecturelist = config[pub][str(x)].split(",")
+                lecturelist = config[pub][str(x)].split(";")
                 lecture_name = lecturelist.pop(0).strip()
                 courseObject.add_lecture(lecture_name, x, [topic.strip() for topic in lecturelist])
         except KeyError:
-            print(f"Courses should be added as <lecturenumber = name, topic1, topic2 ... topicN> under publication {courseObject.name} in settings.ini")
+            print(f"Lectures should be added as <lecturenumber = name, topic1, topic2 ... topicN> under publication {courseObject.name} in settings.ini")
             continue
 
         # Load header/footer slides
@@ -304,10 +304,6 @@ if __name__ == "__main__":
 
         # Go through all or a subset of lectures
         for n in range(1, courseObject.lectures+1):
-            #If not included in this publication, continue
-            if n not in [lecture.lectureNumber for lecture in courseObject.lecture_list]:
-                print(f"Luentomateriaali {n}: tämä luento ei sisälly tähän kurssiin.")
-                continue
 
             # Check if the publication folder exists, create if necessary, check published file
             matpubdir = f"{courseObject.publication_dir}/{courseObject.lectureterm} {n:02}"
@@ -333,14 +329,14 @@ if __name__ == "__main__":
                         print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot päivitetty -> julkaistaan")
                     updateFlag = True
             if not n in pubslides:
-                print(f"Luentomateriaali {n} -> Luento {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
+                print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
             elif updateFlag and not missingSlides:
                 if not published_slides.exists():
                     if not silent:
-                        print(f"Luentomateriaali {n} -> Luento {n}: ei vielä julkaistu -> julkaistaan")
+                        print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n}: ei vielä julkaistu -> julkaistaan")
                 else:
                     if not silent:
-                        print(f"Luentomateriaali {n} -> Luento {n} on päivitetty -> julkaistaan")
+                        print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n} on päivitetty -> julkaistaan")
                 newslides = PdfWriter()
 
                     # Take starting slide, update course and lecture name

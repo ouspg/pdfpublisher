@@ -1,5 +1,5 @@
 class Course:
-    def __init__(self, coursecode: str, coursesize: int, lectures: int, name: str, filename_prefix: str, lectureterm: str, publication_dir: str, course_slides_dir: str):
+    def __init__(self, coursecode: str, coursesize: str, lectures: int, name: str, filename_prefix: str, lectureterm: str, publication_dir: str, course_slides_dir: str):
         self.name = name
         self.coursecode = coursecode
         self.coursesize = coursesize
