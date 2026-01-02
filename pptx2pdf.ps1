@@ -130,7 +130,11 @@ while ($true) {
     $ppApp.Quit()
 
 
-    #Variable sleep time depending on time of day
+    #Variable sleep time depending on time of day and weekday
+    if ((Get-Date).DayOfWeek -in 'Saturday','Sunday') {
+        $sleepSeconds = 21600
+        Write-Host "It's the weekend, sleeping for $($sleepSeconds/3600) hours..."
+    } else {
     $hour = (Get-Date).Hour
     if ($hour -ge 8 -and $hour -lt 15) {
         $sleepSeconds = 300
@@ -141,6 +145,7 @@ while ($true) {
     } else {
         $sleepSeconds = 10800
         Write-Host "Night time... sleeping for $($sleepSeconds/3600) hours..."
-    }
+    }}
+
     Start-Sleep -Seconds $sleepSeconds
 }
