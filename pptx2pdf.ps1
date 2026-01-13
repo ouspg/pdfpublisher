@@ -67,17 +67,28 @@ while ($true) {
 
     Write-Host "Scanning folders at $(Get-Date)..."
 
-    # Start PowerPoint once per loop for efficiency
-    $ppApp = New-Object -ComObject PowerPoint.Application
- 
-    #Not visible if possible
+    # See if powerpoint is running or not
+    $ppApp = $null 
+    $powerpointWasRunning = $true
     try { 
-        # Attempt to hide PowerPoint $ppApp.
-        Visible = [Microsoft.Office.Core.MsoTriState]::msoFalse 
+        # Try to get an existing instance 
+        $ppApp = [Runtime.InteropServices.Marshal]::GetActiveObject("PowerPoint.Application") 
         } catch { 
-        Write-Warning "PowerPoint cannot be hidden on this system. Continuing with visible window." 
-        # Fallback: force it visible so the script continues safely 
-        $ppApp.Visible = [Microsoft.Office.Core.MsoTriState]::msoTrue 
+        # No existing instance → create one 
+        $powerpointWasRunning = $false 
+        $ppApp = New-Object -ComObject PowerPoint.Application 
+        }
+
+    #Not visible if possible and powerpoint was not running
+    if (-not $powerpointWasRunning) {
+        try { 
+            # Attempt to hide PowerPoint $ppApp.
+            Visible = [Microsoft.Office.Core.MsoTriState]::msoFalse 
+            } catch { 
+            Write-Warning "PowerPoint cannot be hidden on this system. Continuing with visible window." 
+            # Fallback: force it visible so the script continues safely 
+            $ppApp.Visible = [Microsoft.Office.Core.MsoTriState]::msoTrue 
+            }
         }
 
     foreach ($folder in $folders) {
@@ -113,7 +124,6 @@ while ($true) {
 
             if ($needsUpdate) {
                 Write-Host "Updating..."
-
                 try {
                     $presentation = $ppApp.Presentations.Open($pptx.FullName, $false, $false, $false)
                     # File type 32 = PDF
@@ -126,8 +136,8 @@ while ($true) {
         }
     }
 
-    # Close PowerPoint for this loop
-    $ppApp.Quit()
+    # Close PowerPoint if it was not running
+    if (-not $powerpointWasRunning) { $ppApp.Quit() }
 
 
     #Variable sleep time depending on time of day and weekday
