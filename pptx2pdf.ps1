@@ -73,8 +73,10 @@ while ($true) {
     try { 
         # Try to get an existing instance 
         $ppApp = [Runtime.InteropServices.Marshal]::GetActiveObject("PowerPoint.Application") 
+        Write-Host "Powerpoint is running!"
         } catch { 
         # No existing instance → create one 
+        Write-Host "Powerpoint needs to be started."
         $powerpointWasRunning = $false 
         $ppApp = New-Object -ComObject PowerPoint.Application 
         }
@@ -137,7 +139,10 @@ while ($true) {
     }
 
     # Close PowerPoint if it was not running
-    if (-not $powerpointWasRunning) { $ppApp.Quit() }
+    if (-not $powerpointWasRunning) { 
+         Write-Host "Powerpoint was not running, closing..."
+         $ppApp.Quit()
+    }
 
 
     #Variable sleep time depending on time of day and weekday
