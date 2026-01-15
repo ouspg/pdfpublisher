@@ -18,7 +18,7 @@ class ConfigManager:
     "titlefont": ["font","font_max_size","font_min_size","colour","maxlines"],
         }
        self.PUBLICATION_OPTIONS = set(["coursecode",
-"languages",
+"translate_to",
 "publish_dir",
 "coursesize",
 "lectures",
