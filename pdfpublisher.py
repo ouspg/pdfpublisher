@@ -71,10 +71,16 @@ def add_title(page: PageObject, lectureterm: str, lecturenum: int, lecturetitle:
 #############################################################################
 # Tiedostojen haku
 #############################################################################
-def load_directory(directory):
+def load_directory(directory,lang = None):
     files = {}
     folder = Path(directory)
-    for f in folder.glob("*.pdf"):
+    if lang is None:
+        files = folder.glob("*.pdf")
+    elif lang == "":
+        files = [f for f in folder.glob("*.pdf") if not re.compile(r"_\w{2}\.pdf$").search(f.name)]
+    else:
+        files = folder.glob(f"*_{lang}.pdf")
+    for f in files:
         match = re.search(r'\d+', f.stem)
         num = int(match.group()) if match else None
         if isinstance(num, int):
