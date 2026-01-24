@@ -171,15 +171,19 @@ def checkLinksOnFile(file, silent):
             print(f"Tiedoston {file.name} kaikki linkit toimivat oikein.")
     sys.exit(0)
 
-def publish_lectures(courseObject,config):
-        #Load publication-specific update dates
-        pubslides = load_directory(courseObject.course_slides_dir)
-
+def publish_lectures(courseObject,config,lang):
+        #Load slide update dates
+        pubslides = load_directory(courseObject.course_slides_dir,lang)
+        slide_updates = load_directory(config['settings']['lecture_slides_dir'])
+        if not lang = "":
+            suffix = f"_{lang}.pdf"
+        else:
+            suffix = ".pdf"
         # Load header/footer slides
         # Should be moved to courseObject class to remove need to pass config here...
-        Startingslides = PdfReader(Path(courseObject.course_slides_dir) / config["settings"]["headerfile"].with_suffix(".pdf"))
-        Dividerslides = PdfReader(Path(courseObject.course_slides_dir) / config["settings"]["dividerfile"].with_suffix(".pdf"))
-        Endingslides = PdfReader(Path(courseObject.course_slides_dir) / config["settings"]["footerfile"].with_suffix(".pdf"))
+        Startingslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config["settings"]["headerfile"]}{suffix}")
+        Dividerslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config["settings"]["dividerfile"]}{suffix}")
+        Endingslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config["settings"]["footerfile"]}{suffix}")
 
         # Go through all or a subset of lectures
         for n in range(1, courseObject.lectures+1):
@@ -189,14 +193,14 @@ def publish_lectures(courseObject,config):
             matpubpath = Path(matpubdir)
             if not matpubpath.exists():
                 matpubpath.mkdir(parents=True, exist_ok=True)
-            filename = re.sub(r'[\\/]', '', f"{n:02} - {courseObject.filename_prefix} {courseObject.lectureterm.lower()} {n} – {courseObject.lecture_list[n-1].name}.pdf")[:200]
+            filename = re.sub(r'[\\/]', '', f"{n:02} - {courseObject.filename_prefix} {courseObject.lectureterm.lower()} {n} – {courseObject.lecture_list[n-1].name}{suffix}")[:200]
             published_slides = matpubpath / filename
 
             # First check the slides, later additional materials
             updateFlag = False
             missingSlides = False
             for topic in courseObject.lecture_list[n-1].topic_list:
-                topic = f"{topic}.pdf"
+                topic = f"{topic}{suffix}"
                 if not topic in slide_updates:
                     print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot eivät vielä saatavilla")
                     missingSlides = True
@@ -228,7 +232,7 @@ def publish_lectures(courseObject,config):
 
                 # make lecture slides from topics
                 for topic in courseObject.lecture_list[n-1].topic_list:
-                    Lectureslides = PdfReader(slide_updates[f"{topic}.pdf"]["file"])
+                    Lectureslides = PdfReader(slide_updates[f"{topic}{suffix}"]["file"])
                     for page in Lectureslides.pages:
                         newslides.add_page(page)
 
@@ -248,7 +252,7 @@ def publish_lectures(courseObject,config):
                 # Write to file
                 if not silent:
                     print("Luodaan pdf...")
-                filename = re.sub(r'[\\/]', '', f"{n:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {n}: {courseObject.lecture_list[n-1].name}.pdf")[:200]
+                filename = re.sub(r'[\\/]', '', f"{n:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {n}: {courseObject.lecture_list[n-1].name}{suffix}")[:200]
                 with open(published_slides,"wb") as f:
                     newslides.write(f)
 
@@ -303,7 +307,6 @@ if __name__ == "__main__":
     if not silent:
         print("Config loaded successfully!")
 
-    slide_updates = load_directory(config['settings']['lecture_slides_dir'])
 
     if args.checkfile:
         if not silent:
@@ -319,5 +322,8 @@ if __name__ == "__main__":
         if not silent:
             print(f"Tarkistetaan {config[pub]['coursename']}")
         courseObject = create_course_object(config, pub)
-        publish_lectures(courseObject,config)
+        publish_lectures(courseObject,config,"")
+        if not config[pub]['translate_to'] == "":
+            for lang in config[pub]['translate_to'].split(","):
+                publish_lectures(courseObject,config,lang)
         publish_materials(courseObject,config)
