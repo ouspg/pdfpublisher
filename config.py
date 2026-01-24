@@ -1,84 +1,6 @@
 from configparser import ConfigParser
 from pathlib import Path
-
-class ConfigManager:
-    """
-    A simple configuration manager that:
-    - loads settings.ini
-    - ensures required sections/keys exist
-    - writes missing placeholders
-    - provides helper getters
-    """
-
-    def __init__(self, path: Path | str = "settings.ini"):
-
-	   self.REQUIRED_SETTINGS = {
-    "settings": ["lecture_slides_dir","headerfile","footerfile","dividerfile"],
-	"gen_ai": ["AI","API_KEY","Model","Request_timeout_ms","Max_requests_per_minute"],
-    "titlefont": ["font","font_max_size","font_min_size","colour","maxlines"],
-        }
-       self.PUBLICATION_OPTIONS = set(["coursecode",
-"translate_to",
-"publish_dir",
-"coursesize",
-"lectures",
-"coursename",
-"filename_prefix",
-"lectureterm",
-"course_slides_dir"])
-	
-        self.path = Path(path)
-        self.config = ConfigParser()
-
-        self._load()
-        self._ensure_required()
-        self._save_if_modified()
-
-    # ---------------------------------------------------------
-    # Internal helpers
-    # ---------------------------------------------------------
-
-    def _load(self):
-        # Load config here based on previous code.
-
-    def _ensure_required(self):
-        """Ensure all required sections and keys exist."""
-        self.modified = False
-        for section, keys in self.required.items():
-            if not self.config.has_section(section):
-                self.config.add_section(section)
-                self.modified = True
-
-            for key in keys:
-                if not self.config.has_option(section, key):
-                    self.config.set(section, key, "")
-                    self.modified = True
-
-    def _save_if_modified(self):
-        if self.modified:
-            with self.path.open("w") as f:
-                self.config.write(f)
-
-    # ---------------------------------------------------------
-    # Public utility getters
-    # ---------------------------------------------------------
-
-    def get(self, section: str, key: str, fallback=None) -> str:
-        return self.config.get(section, key, fallback=fallback)
-
-    def get_int(self, section: str, key: str, fallback=None) -> int:
-        return self.config.getint(section, key, fallback=fallback)
-
-    def get_bool(self, section: str, key: str, fallback=None) -> bool:
-        return self.config.getboolean(section, key, fallback=fallback)
-
-    def set(self, section: str, key: str, value: str):
-        self.config.set(section, key, value)
-        with self.path.open("w") as f:
-            self.config.write(f)
-
-
-
+import sys
 
 #############################################################################
 # CONFIGURATION
@@ -89,28 +11,26 @@ FOOTER_FILE = "footer"
 
 # Required mandatory configurations
 REQUIRED_SETTINGS = {
-    "settings": ["lecture_slides_dir","headerfile","footerfile","dividerfile"],
+	"settings": ["lecture_slides_dir","headerfile","footerfile","dividerfile"],
 	"gen_ai": ["AI","API_KEY","Model","Request_timeout_ms","Max_requests_per_minute"],
-    "titlefont": ["font","font_max_size","font_min_size","colour","maxlines"],
+    "titlefont": ["font","font_max_size","font_min_size","colour","maxlines"]
 }
 
 # Mandatory options for all publications
-PUBLICATION_OPTIONS = set(["coursecode",
-"publish_dir",
-"coursesize",
-"lectures",
-"coursename",
-"filename_prefix",
-"lectureterm",
-"course_slides_dir"])
+PUBLICATION_OPTIONS = set(["coursecode", 
+						   "translate_to",
+						   "ai_prompt",
+						   "publish_dir",
+						   "coursesize",
+						   "lectures",
+						   "coursename",
+						   "filename_prefix",
+						   "lectureterm",
+						   "course_slides_dir"])
 
 #############################################################################
 # Load and validate
 #############################################################################
-
-
-
-
 def load_config():
     config = configparser.ConfigParser()
 
@@ -174,6 +94,5 @@ def load_config():
         sys.exit(1)
     if len(publications) == 0:
         print(f"[ERROR] At least one publication required! Added empty one to {CONFIG_FILE}!")
-        sys.exit(1)
-	
+        sys.exit(1)	
     return (config,publications)
