@@ -207,9 +207,9 @@ if __name__ == "__main__":
             continue
 
         # Load header/footer slides
-        Startingslides = PdfReader(Path(courseObject.course_slides_dir) / config["settings"]["headerfile"])
-        Dividerslides = PdfReader(Path(courseObject.course_slides_dir) / config["settings"]["dividerfile"])
-        Endingslides = PdfReader(Path(courseObject.course_slides_dir) / config["settings"]["footerfile"])
+        Startingslides = PdfReader(Path(courseObject.course_slides_dir) / config["settings"]["headerfile"].with_suffix(".pdf"))
+        Dividerslides = PdfReader(Path(courseObject.course_slides_dir) / config["settings"]["dividerfile"].with_suffix(".pdf"))
+        Endingslides = PdfReader(Path(courseObject.course_slides_dir) / config["settings"]["footerfile"].with_suffix(".pdf"))
 
         # Go through all or a subset of lectures
         for n in range(1, courseObject.lectures+1):
