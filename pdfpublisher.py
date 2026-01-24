@@ -108,7 +108,13 @@ def create_course_object(config, pub):
                             config[pub]['lectureterm'],
                             config[pub]['publish_dir'],
                             config[pub]['course_slides_dir'])
-
+    for x in range(1, courseObject.lectures+1):
+        lecturelist = config[pub][str(x)].split(";")
+        lecture_name = lecturelist.pop(0).strip()
+        courseObject.add_lecture(lecture_name, x, [topic.strip() for topic in lecturelist])
+    except KeyError:
+        print(f"Lectures should be added as <lecturenumber = name, topic1, topic2 ... topicN> under publication {courseObject.name} in settings.ini")
+        continue
     return courseObject
 
 def link_health_check(config, pub, silent):
@@ -162,17 +168,6 @@ def checkLinksOnFile(file, silent):
 def publish_lectures(courseObject,config):
         #Load publication-specific update dates
         pubslides = load_directory(courseObject.course_slides_dir)
-
-        # Shouldn't create_course_object do this?
-        # Read the lecture names and topics from the configuration, error if not enough lecture definitions are found:
-        #try:
-        #    for x in range(1, courseObject.lectures+1):
-        #        lecturelist = config[pub][str(x)].split(";")
-        #        lecture_name = lecturelist.pop(0).strip()
-        #        courseObject.add_lecture(lecture_name, x, [topic.strip() for topic in lecturelist])
-        #except KeyError:
-        #    print(f"Lectures should be added as <lecturenumber = name, topic1, topic2 ... topicN> under publication {courseObject.name} in settings.ini")
-        #    continue
 
         # Load header/footer slides
         # Should be moved to courseObject class to remove need to pass config here...
