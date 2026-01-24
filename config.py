@@ -32,7 +32,7 @@ PUBLICATION_OPTIONS = set(["coursecode",
 # Load and validate
 #############################################################################
 def load_config():
-    config = configparser.ConfigParser()
+    config = ConfigParser()
 
     # Read existing file (if any)
     try:

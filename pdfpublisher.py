@@ -75,12 +75,12 @@ def load_directory(directory,lang = None):
     files = {}
     folder = Path(directory)
     if lang is None:
-        files = folder.glob("*.pdf")
+        dir_files = folder.glob("*.pdf")
     elif lang == "":
-        files = [f for f in folder.glob("*.pdf") if not re.compile(r"_\w{2}\.pdf$").search(f.name)]
+        dir_files = [f for f in folder.glob("*.pdf") if not re.compile(r"_\w{2}\.pdf$").search(f.name)]
     else:
-        files = folder.glob(f"*_{lang}.pdf")
-    for f in files:
+        dir_files = folder.glob(f"*_{lang}.pdf")
+    for f in dir_files:
         match = re.search(r'\d+', f.stem)
         num = int(match.group()) if match else None
         if isinstance(num, int):
@@ -114,13 +114,13 @@ def create_course_object(config, pub):
                             config[pub]['lectureterm'],
                             config[pub]['publish_dir'],
                             config[pub]['course_slides_dir'])
-    for x in range(1, courseObject.lectures+1):
-        lecturelist = config[pub][str(x)].split(";")
-        lecture_name = lecturelist.pop(0).strip()
-        courseObject.add_lecture(lecture_name, x, [topic.strip() for topic in lecturelist])
+    try:
+        for x in range(1, courseObject.lectures+1):
+            lecturelist = config[pub][str(x)].split(";")
+            lecture_name = lecturelist.pop(0).strip()
+            courseObject.add_lecture(lecture_name, x, [topic.strip() for topic in lecturelist])
     except KeyError:
         print(f"Lectures should be added as <lecturenumber = name, topic1, topic2 ... topicN> under publication {courseObject.name} in settings.ini")
-        continue
     return courseObject
 
 def link_health_check(config, pub, silent):
@@ -175,15 +175,15 @@ def publish_lectures(courseObject,config,lang):
         #Load slide update dates
         pubslides = load_directory(courseObject.course_slides_dir,lang)
         slide_updates = load_directory(config['settings']['lecture_slides_dir'])
-        if not lang = "":
+        if not lang == "":
             suffix = f"_{lang}.pdf"
         else:
             suffix = ".pdf"
         # Load header/footer slides
         # Should be moved to courseObject class to remove need to pass config here...
-        Startingslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config["settings"]["headerfile"]}{suffix}")
-        Dividerslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config["settings"]["dividerfile"]}{suffix}")
-        Endingslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config["settings"]["footerfile"]}{suffix}")
+        Startingslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config['settings']['headerfile']}{suffix}")
+        Dividerslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config['settings']['dividerfile']}{suffix}")
+        Endingslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config['settings']['footerfile']}{suffix}")
 
         # Go through all or a subset of lectures
         for n in range(1, courseObject.lectures+1):
@@ -260,6 +260,11 @@ def publish_materials(courseObject,config):
     # Go through all or a subset of lectures
     for n in range(1, courseObject.lectures+1):
         # Check materials
+        # Check if the publication folder exists, create if necessary, check published file
+        matpubdir = f"{courseObject.publication_dir}/{courseObject.lectureterm} {n:02}"
+        matpubpath = Path(matpubdir)
+        if not matpubpath.exists():
+            matpubpath.mkdir(parents=True, exist_ok=True)
         materials_for_all = load_full_directory(f"{config['settings']['lecture_slides_dir']}/{n:02}")
         materials_forcourse = load_full_directory(f"{courseObject.course_slides_dir}/{n:02}")
         materials_published = load_full_directory(matpubdir)
