@@ -5,9 +5,15 @@ def create_course_object(config, pub):
                             config[pub]['coursename'],
                             config[pub]['filename_prefix'],
                             config[pub]['lectureterm'],
-                            config[pub]['publish_dir'],  
+                            config[pub]['publish_dir'], 
                             config[pub]['course_slides_dir'])
-    
+    try:
+        for x in range(1, courseObject.lectures+1):  
+            lecturelist = config[pub][str(x)].split(";")
+            lecture_name = lecturelist.pop(0).strip()
+            courseObject.add_lecture(lecture_name, x, [topic.strip() for topic in lecturelist])
+    except KeyError:
+        print(f"Lectures should be added as <lecturenumber = name, topic1, topic2 ... topicN> under publication {courseObject.name} in settings.ini")
     return courseObject
 
 class Course:

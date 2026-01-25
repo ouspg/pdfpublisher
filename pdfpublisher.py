@@ -72,10 +72,16 @@ def add_title(page: PageObject, lectureterm: str, lecturenum: int, lecturetitle:
 #############################################################################
 # Tiedostojen haku
 #############################################################################
-def load_directory(directory):
+def load_directory(directory,lang = None):
     files = {}
     folder = Path(directory)
-    for f in folder.glob("*.pdf"):
+    if lang is None:
+        dir_files = folder.glob("*.pdf")
+    elif lang == "":
+        dir_files = [f for f in folder.glob("*.pdf") if not re.compile(r"_\w{2}\.pdf$").search(f.name)]
+    else:
+        dir_files = folder.glob(f"*_{lang}.pdf")
+    for f in dir_files:
         match = re.search(r'\d+', f.stem)
         num = int(match.group()) if match else None
         if isinstance(num, int):
@@ -148,93 +154,61 @@ def checkLinksOnFile(file, silent):
             print(f"Tiedoston {file.name} kaikki linkit toimivat oikein.")
     sys.exit(0)
 
-#############################################################################
-# MAIN
-#############################################################################
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="PDF Publisher for Lecture Materials")
-    parser.add_argument("--linkcheck", "-l", action="store_true", help="Run link health check")
-    parser.add_argument("--silent", "-s", action="store_true", help="Silent mode, minimal output")
-    parser.add_argument("--checkfile", "-f", type=str, help="Check links in a specific PDF file")
-    args = parser.parse_args()
-    
-    silent = args.silent
-
-    (config, publications) = load_config()
-    if not silent:
-        print("Config loaded successfully!")
-
-    slide_updates = load_directory(config['settings']['lecture_slides_dir'])
-
-    if args.checkfile:
-        if not silent:
-            print("Tarkistetaan linkit tiedostosta:", args.checkfile)
-        checkLinksOnFile(args.checkfile, silent)
-    
-    #link health check
-    if args.linkcheck:
-        link_health_check(config, publications, silent)
-
-    #Main program
-    for pub in publications:
-        if not silent:
-            print(f"Tarkistetaan {config[pub]['coursename']}")
-        courseObject = create_course_object(config, pub)
-
-        #Load publication-specific update dates
-        pubslides = load_directory(courseObject.course_slides_dir)
-
-        # Read the lecture names and topics from the configuration, error if not enough lecture definitions are found:
-        try:
-            for x in range(1, courseObject.lectures+1):
-                lecturelist = config[pub][str(x)].split(";")
-                lecture_name = lecturelist.pop(0).strip()
-                courseObject.add_lecture(lecture_name, x, [topic.strip() for topic in lecturelist])
-        except KeyError:
-            print(f"Lectures should be added as <lecturenumber = name, topic1, topic2 ... topicN> under publication {courseObject.name} in settings.ini")
-            continue
-
+def publish_lectures(courseObject,config,lang):
+        #Load slide update dates
+        pubslides = load_directory(courseObject.course_slides_dir,lang)
+        slide_updates = load_directory(config['settings']['lecture_slides_dir'])
+        if not lang == "":
+            suffix = f"_{lang}.pdf"
+        else:
+            suffix = ".pdf"
         # Load header/footer slides
-        Startingslides = PdfReader((Path(courseObject.course_slides_dir) / config["settings"]["headerfile"]).with_suffix(".pdf"))
-        Dividerslides = PdfReader((Path(courseObject.course_slides_dir) / config["settings"]["dividerfile"]).with_suffix(".pdf"))
-        Endingslides = PdfReader((Path(courseObject.course_slides_dir) / config["settings"]["footerfile"]).with_suffix(".pdf"))
+        # Should be moved to courseObject class to remove need to pass config here...
+        Startingslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config['settings']['headerfile']}{suffix}")
+        Dividerslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config['settings']['dividerfile']}{suffix}")
+        Endingslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config['settings']['footerfile']}{suffix}")
 
         # Go through all or a subset of lectures
         for n in range(1, courseObject.lectures+1):
+            print(f"  \_{config[pub]['lectureterm']} {n} ({courseObject.lecture_list[n-1].name})") 
 
             # Check if the publication folder exists, create if necessary, check published file
             matpubdir = f"{courseObject.publication_dir}/{courseObject.lectureterm} {n:02}"
             matpubpath = Path(matpubdir)
             if not matpubpath.exists():
                 matpubpath.mkdir(parents=True, exist_ok=True)
-            filename = re.sub(r'[\\/]', '', f"{n:02} - {courseObject.filename_prefix} {courseObject.lectureterm.lower()} {n} – {courseObject.lecture_list[n-1].name}.pdf")[:200]
+            filename = re.sub(r'[\\/]', '', f"{n:02} - {courseObject.filename_prefix} {courseObject.lectureterm.lower()} {n} – {courseObject.lecture_list[n-1].name}{suffix}")[:200]
             published_slides = matpubpath / filename
 
             # First check the slides, later additional materials
             updateFlag = False
             missingSlides = False
             for topic in courseObject.lecture_list[n-1].topic_list:
-                topic = f"{topic}.pdf"
+                topic = f"{topic}{suffix}"
                 if not topic in slide_updates:
-                    print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot eivät vielä saatavilla")
+                    print(f"    \_Aihe {topic}: luentokalvot eivät vielä saatavilla")
+                    #print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot eivät vielä saatavilla")
                     missingSlides = True
                 elif published_slides.exists() and slide_updates[topic]["modtime"] <= published_slides.stat().st_mtime and pubslides[n]["modtime"] <= published_slides.stat().st_mtime:
                     if not silent:
-                        print(f"Luentomateriaali {n} -> Aihe {topic}: ajan tasalla")
+                        print(f"    \_Aihe {topic}: ajan tasalla!")
+                        #print(f"Luentomateriaali {n} -> Aihe {topic}: ajan tasalla")
                 else:
                     if not silent:
-                        print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot päivitetty -> julkaistaan")
+                        print(f"    \_Aihe {topic}: luentokalvot päivitetty, voi julkaista!")
                     updateFlag = True
             if not n in pubslides:
-                print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
+                print(f"    \_kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
+                #print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
             elif updateFlag and not missingSlides:
                 if not published_slides.exists():
                     if not silent:
-                        print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n}: ei vielä julkaistu -> julkaistaan")
+                        #print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n}: ei vielä julkaistu -> julkaistaan")
+                        print(f"    \_Ei vielä julkaistu -> julkaistaan")
                 else:
                     if not silent:
-                        print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n} on päivitetty -> julkaistaan")
+                        #print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n} on päivitetty -> julkaistaan")
+                        print(f"    \_Materiaalia on päivitetty -> julkaistaan")
                 newslides = PdfWriter()
 
                     # Take starting slide, update course and lecture name
@@ -247,7 +221,7 @@ if __name__ == "__main__":
 
                 # make lecture slides from topics
                 for topic in courseObject.lecture_list[n-1].topic_list:
-                    Lectureslides = PdfReader(slide_updates[f"{topic}.pdf"]["file"])
+                    Lectureslides = PdfReader(slide_updates[f"{topic}{suffix}"]["file"])
                     for page in Lectureslides.pages:
                         newslides.add_page(page)
 
@@ -266,37 +240,92 @@ if __name__ == "__main__":
 
                 # Write to file
                 if not silent:
-                    print("Luodaan pdf...")
-                filename = re.sub(r'[\\/]', '', f"{n:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {n}: {courseObject.lecture_list[n-1].name}.pdf")[:200]
+                    #print("Luodaan pdf...")
+                    print(f"    \_Tallennetaan PDF")
+                filename = re.sub(r'[\\/]', '', f"{n:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {n}: {courseObject.lecture_list[n-1].name}{suffix}")[:200]
                 with open(published_slides,"wb") as f:
                     newslides.write(f)
 
-            # Check materials
-            materials_for_all = load_full_directory(f"{config['settings']['lecture_slides_dir']}/{n:02}")
-            materials_forcourse = load_full_directory(f"{courseObject.course_slides_dir}/{n:02}")
-            materials_published = load_full_directory(matpubdir)
-            if len(materials_for_all) + len(materials_forcourse) > 0:
-                for filename, file in materials_for_all.items():
-                    if filename not in materials_published:
-                        if not silent:
-                            print(f"...Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.")
-                        shutil.copy2(file['file'], matpubpath / filename)
-                    elif file["modtime"] > materials_published[filename]["modtime"]:
-                        if not silent:
-                            print(f"...Tiedostosta {filename} on uudempi versio, julkaistaan.")
-                        shutil.copy2(file['file'], materials_published[filename]["file"])
-                    else:
-                        if not silent:
-                            print(f"...Tiedosto {filename} on ajan tasalla")
-                for filename, file in materials_forcourse.items():
-                    if filename not in materials_published:
-                        if not silent:
-                            print(f"...Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.")
-                        shutil.copy2(file['file'], matpubpath / filename)
-                    elif file["modtime"] > materials_published[filename]["modtime"]:
-                        if not silent:
-                            print(f"...Tiedostosta {filename} on uudempi versio, julkaistaan.")
-                        shutil.copy2(file['file'], materials_published[filename]["file"])
-                    else:
-                        if not silent:
-                            print(f"...Tiedosto {filename} on ajan tasalla")
+def publish_materials(courseObject,config):
+    # Go through all or a subset of lectures
+    for n in range(1, courseObject.lectures+1):
+        # Check materials
+        # Check if the publication folder exists, create if necessary, check published file
+        matpubdir = f"{courseObject.publication_dir}/{courseObject.lectureterm} {n:02}"
+        matpubpath = Path(matpubdir)
+        if not matpubpath.exists():
+            matpubpath.mkdir(parents=True, exist_ok=True)
+        materials_for_all = load_full_directory(f"{config['settings']['lecture_slides_dir']}/{n:02}")
+        materials_forcourse = load_full_directory(f"{courseObject.course_slides_dir}/{n:02}")
+        materials_published = load_full_directory(matpubdir)
+        materialcount = len(materials_for_all) + len(materials_forcourse)
+        if materialcount == 0:
+            print(f"  \_{config[pub]['lectureterm']} {n}: ei materiaaleja")
+        else:
+            print(f"  \_{config[pub]['lectureterm']} {n}: yhteensä {materialcount} materiaalia jaettavaksi") 
+            for filename, file in materials_for_all.items():
+                if filename not in materials_published:
+                    if not silent:
+                        print(f"    \_Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.")
+                    shutil.copy2(file['file'], matpubpath / filename)
+                elif file["modtime"] > materials_published[filename]["modtime"]:
+                    if not silent:
+                        print(f"    \_Tiedostosta {filename} on uudempi versio, julkaistaan.")
+                    shutil.copy2(file['file'], materials_published[filename]["file"])
+                else:
+                    if not silent:
+                        print(f"    \_Tiedosto {filename} on ajan tasalla")
+            for filename, file in materials_forcourse.items():
+                if filename not in materials_published:
+                    if not silent:
+                        print(f"    \_Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.")
+                    shutil.copy2(file['file'], matpubpath / filename)
+                elif file["modtime"] > materials_published[filename]["modtime"]:
+                    if not silent:
+                        print(f"    \_Tiedostosta {filename} on uudempi versio, julkaistaan.")
+                    shutil.copy2(file['file'], materials_published[filename]["file"])
+                else:
+                    if not silent:
+                        print(f"    \_Tiedosto {filename} on ajan tasalla")
+
+    
+#############################################################################
+# MAIN
+#############################################################################
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="PDF Publisher for Lecture Materials")
+    parser.add_argument("--linkcheck", "-l", action="store_true", help="Run link health check")
+    parser.add_argument("--silent", "-s", action="store_true", help="Silent mode, minimal output")
+    parser.add_argument("--checkfile", "-f", type=str, help="Check links in a specific PDF file")
+    args = parser.parse_args()
+    
+    silent = args.silent
+
+    (config, publications) = load_config()
+    if not silent:
+        print("Config loaded successfully!")
+
+
+    if args.checkfile:
+        if not silent:
+            print("Tarkistetaan linkit tiedostosta:", args.checkfile)
+        checkLinksOnFile(args.checkfile, silent)
+    
+    #link health check
+    if args.linkcheck:
+        link_health_check(config, publications, silent)
+
+    #Main program
+    for pub in publications:
+        if not silent:
+            print(f"*****************************************\nTarkistetaan {config[pub]['coursename']}")
+        courseObject = create_course_object(config, pub)
+        print(f"\_Tarkistetaan suomenkieliset luennot")
+        publish_lectures(courseObject,config,"")
+        if not config[pub]['translate_to'] == "":
+            for lang in config[pub]['translate_to'].split(","):
+                print(f"\_Tarkistetaan käännökset fi->{lang}")
+                publish_lectures(courseObject,config,lang)
+        print(f"\_Tarkistetaan materiaalikansiot")
+        publish_materials(courseObject,config)

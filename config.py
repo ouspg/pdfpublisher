@@ -1,4 +1,4 @@
-import configparser
+from configparser import ConfigParser
 from pathlib import Path
 import sys
 
@@ -11,25 +11,28 @@ FOOTER_FILE = "footer"
 
 # Required mandatory configurations
 REQUIRED_SETTINGS = {
-    "settings": ["lecture_slides_dir","headerfile","footerfile","dividerfile"],	
-    "gen_ai": ["AI","API_KEY","Model","Request_timeout_ms","Max_requests_per_minute"],
-    "titlefont": ["font","font_max_size","font_min_size","colour","maxlines"],
+	"settings": ["lecture_slides_dir","headerfile","footerfile","dividerfile"],
+	"gen_ai": ["AI","API_KEY","Model","Minimum_translations","Request_timeout_ms","Max_requests_per_minute"],
+        "titlefont": ["font","font_max_size","font_min_size","colour","maxlines"]
 }
 
 # Mandatory options for all publications
-PUBLICATION_OPTIONS = set(["coursecode",
-"translate_to",
-"ai_prompt",
-"publish_dir",
-"coursesize",
-"lectures",
-"coursename",
-"filename_prefix",
-"lectureterm",
-"course_slides_dir"])
+PUBLICATION_OPTIONS = set(["coursecode", 
+						   "translate_to",
+						   "ai_prompt",
+						   "publish_dir",
+						   "coursesize",
+						   "lectures",
+						   "coursename",
+						   "filename_prefix",
+						   "lectureterm",
+						   "course_slides_dir"])
 
+#############################################################################
+# Load and validate
+#############################################################################
 def load_config():
-    config = configparser.ConfigParser()
+    config = ConfigParser()
 
     # Read existing file (if any)
     try:
@@ -91,6 +94,5 @@ def load_config():
         sys.exit(1)
     if len(publications) == 0:
         print(f"[ERROR] At least one publication required! Added empty one to {CONFIG_FILE}!")
-        sys.exit(1)
-	
+        sys.exit(1)	
     return (config,publications)
