@@ -15,6 +15,7 @@ Settings for calling generative AI
 - AI: name of the AI used, eg. Google
 - API_KEY: ...
 - Model: Model to be called
+- Minimum_translations: under this amount of texts the translation is done manually to save API calls
 - Request_timeout_ms: minimum timeout between calls
 - Max_requests_per_minute: maximum amount of requests per minute
 
