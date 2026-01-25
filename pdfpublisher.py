@@ -187,6 +187,7 @@ def publish_lectures(courseObject,config,lang):
 
         # Go through all or a subset of lectures
         for n in range(1, courseObject.lectures+1):
+            print(f"  \_{config[pub]['lectureterm']} {n} ({courseObject.lecture_list[n-1].name})") 
 
             # Check if the publication folder exists, create if necessary, check published file
             matpubdir = f"{courseObject.publication_dir}/{courseObject.lectureterm} {n:02}"
@@ -202,24 +203,29 @@ def publish_lectures(courseObject,config,lang):
             for topic in courseObject.lecture_list[n-1].topic_list:
                 topic = f"{topic}{suffix}"
                 if not topic in slide_updates:
-                    print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot eivät vielä saatavilla")
+                    print(f"    \_Aihe {topic}: luentokalvot eivät vielä saatavilla")
+                    #print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot eivät vielä saatavilla")
                     missingSlides = True
                 elif published_slides.exists() and slide_updates[topic]["modtime"] <= published_slides.stat().st_mtime and pubslides[n]["modtime"] <= published_slides.stat().st_mtime:
                     if not silent:
-                        print(f"Luentomateriaali {n} -> Aihe {topic}: ajan tasalla")
+                        print(f"    \_Aihe {topic}: ajan tasalla!")
+                        #print(f"Luentomateriaali {n} -> Aihe {topic}: ajan tasalla")
                 else:
                     if not silent:
-                        print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot päivitetty -> julkaistaan")
+                        print(f"    \_Aihe {topic}: luentokalvot päivitetty, voi julkaista!")
                     updateFlag = True
             if not n in pubslides:
-                print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
+                print(f"    \_kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
+                #print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
             elif updateFlag and not missingSlides:
                 if not published_slides.exists():
                     if not silent:
-                        print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n}: ei vielä julkaistu -> julkaistaan")
+                        #print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n}: ei vielä julkaistu -> julkaistaan")
+                        print(f"    \_Ei vielä julkaistu -> julkaistaan")
                 else:
                     if not silent:
-                        print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n} on päivitetty -> julkaistaan")
+                        #print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n} on päivitetty -> julkaistaan")
+                        print(f"    \_Materiaalia on päivitetty -> julkaistaan")
                 newslides = PdfWriter()
 
                     # Take starting slide, update course and lecture name
@@ -251,7 +257,8 @@ def publish_lectures(courseObject,config,lang):
 
                 # Write to file
                 if not silent:
-                    print("Luodaan pdf...")
+                    #print("Luodaan pdf...")
+                    print(f"    \_Tallennetaan PDF")
                 filename = re.sub(r'[\\/]', '', f"{n:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {n}: {courseObject.lecture_list[n-1].name}{suffix}")[:200]
                 with open(published_slides,"wb") as f:
                     newslides.write(f)
@@ -268,31 +275,35 @@ def publish_materials(courseObject,config):
         materials_for_all = load_full_directory(f"{config['settings']['lecture_slides_dir']}/{n:02}")
         materials_forcourse = load_full_directory(f"{courseObject.course_slides_dir}/{n:02}")
         materials_published = load_full_directory(matpubdir)
-        if len(materials_for_all) + len(materials_forcourse) > 0:
+        materialcount = len(materials_for_all) + len(materials_forcourse)
+        if materialcount == 0:
+            print(f"  \_{config[pub]['lectureterm']} {n}: ei materiaaleja")
+        else:
+            print(f"  \_{config[pub]['lectureterm']} {n}: yhteensä {materialcount} materiaalia jaettavaksi") 
             for filename, file in materials_for_all.items():
                 if filename not in materials_published:
                     if not silent:
-                        print(f"...Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.")
+                        print(f"    \_Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.")
                     shutil.copy2(file['file'], matpubpath / filename)
                 elif file["modtime"] > materials_published[filename]["modtime"]:
                     if not silent:
-                        print(f"...Tiedostosta {filename} on uudempi versio, julkaistaan.")
+                        print(f"    \_Tiedostosta {filename} on uudempi versio, julkaistaan.")
                     shutil.copy2(file['file'], materials_published[filename]["file"])
                 else:
                     if not silent:
-                        print(f"...Tiedosto {filename} on ajan tasalla")
+                        print(f"    \_Tiedosto {filename} on ajan tasalla")
             for filename, file in materials_forcourse.items():
                 if filename not in materials_published:
                     if not silent:
-                        print(f"...Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.")
+                        print(f"    \_Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.")
                     shutil.copy2(file['file'], matpubpath / filename)
                 elif file["modtime"] > materials_published[filename]["modtime"]:
                     if not silent:
-                        print(f"...Tiedostosta {filename} on uudempi versio, julkaistaan.")
+                        print(f"    \_Tiedostosta {filename} on uudempi versio, julkaistaan.")
                     shutil.copy2(file['file'], materials_published[filename]["file"])
                 else:
                     if not silent:
-                        print(f"...Tiedosto {filename} on ajan tasalla")
+                        print(f"    \_Tiedosto {filename} on ajan tasalla")
 
     
 #############################################################################
@@ -325,10 +336,13 @@ if __name__ == "__main__":
     #Main program
     for pub in publications:
         if not silent:
-            print(f"Tarkistetaan {config[pub]['coursename']}")
+            print(f"*****************************************\nTarkistetaan {config[pub]['coursename']}")
         courseObject = create_course_object(config, pub)
+        print(f"\_Tarkistetaan suomenkieliset luennot")
         publish_lectures(courseObject,config,"")
         if not config[pub]['translate_to'] == "":
             for lang in config[pub]['translate_to'].split(","):
+                print(f"\_Tarkistetaan käännökset fi->{lang}")
                 publish_lectures(courseObject,config,lang)
+        print(f"\_Tarkistetaan materiaalikansiot")
         publish_materials(courseObject,config)
