@@ -1,160 +1,173 @@
 from config import load_config
+from genai import getAI
 import os
+import shutil
+import argparse
 import sqlite3
 import hashlib
+import copy
 import json
 import time
+import sys
+from database import init_db
 from pathlib import Path
 from pptx import Presentation
-import google.generativeai as genai
+from pptxhandler import get_slide_shapes, get_shape_markdown, markdown_to_shape
+from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+from classes import Course, create_course_object
 
-def init_db():
-    with sqlite3.connect("translations.db") as conn:
-        cursor = conn.cursor()
-        cursor.execute('''CREATE TABLE IF NOT EXISTS original_slides (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            filename TEXT,
-            slide_id INTEGER,
-            content_hash TEXT,
-            last_updated REAL,
-            UNIQUE(filename, slide_id)
-        )''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS translated_slides (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            orig_slide_id INTEGER,
-            lang_code TEXT,
-            last_translated_hash TEXT,
-            last_updated REAL,
-            FOREIGN KEY(orig_slide_id) REFERENCES original_slides(id)
-        )''')
-        conn.commit()
+def lang_code_to_text(code):
+    mapping = {
+        "fi": "Finnish",
+        "sv": "Swedish",
+        "en": "English",
+        "es": "Spanish",
+        "de": "German",
+        "fr": "French"
+    }
+    # Fall back to Klingon if necessary
+    return mapping.get(code.strip().lower(), "Klingon")
 
-def get_slide_content(slide):
-    """Extracts text and returns a hash for tracking changes."""
-    texts = [shape.text.strip() for shape in slide.shapes if hasattr(shape, "text") and shape.text.strip()]
-    content_str = "||".join(texts)
-    content_hash = hashlib.md5(content_str.encode('utf-8')).hexdigest()
-    return texts, content_hash
-
-def sync_slide_order(orig_prs, trans_prs):
-    """Reorders the translated slides to match the original slide sequence."""
-    orig_order = [s.slide_id for s in orig_prs.slides]
-    
-    # Get the XML element for the slide ID list
-    sldIdLst = trans_prs.slides._sldIdLst
-    
-    # Create a mapping of slide_id to its XML element
-    id_to_element = {s.slide_id: s._element for s in trans_prs.slides}
-    
-    # Clear and re-append in the correct order
-    for sid in orig_order:
-        if sid in id_to_element:
-            element = id_to_element[sid]
-            sldIdLst.remove(element)
-            sldIdLst.append(element)
-
-def call_gemini_translate(model, texts, target_lang):
-    if not texts: return []
-    prompt = f"Translate the following Finnish strings to {target_lang}. Return ONLY a JSON list of strings in the exact same order:\n{json.dumps(texts)}"
-    try:
-        response = model.generate_content(prompt)
-        raw = response.text.strip().strip('`').replace('json', '')
-        return json.loads(raw)
-    except Exception as e:
-        print(f"Translation Error: {e}")
-        return []
 
 #############################################################################
 # TRANSLATION
 #############################################################################
 
-def process_pptx(file_path, languages, model)
+def translate_pptx(file_path, languages, prompt, model, conn):
     path = Path(file_path)
-    for lang in languages:
-        print(f"Attempting to translate {file_path} to language: {language}")
-        trans_path = path.parent / f"{path.stem}_{lang}{path.suffix}"
-        # Check if translated file exists. Eg german translation: lecture.pptx --> lecture_de.pptx
-        newfile = False
-        if not trans_path.exists():
-            newfile = True
-            # If not, make a copy for the translated version
-            Presentation(file_path).save(trans_path)
+    cursor = conn.cursor()
+    
+    # Get original file's last modified time
+    orig_mtime = path.stat().st_mtime
 
-        # Check if the original file is newer than the translation OR _if the file was just created_    
-        if path.stat().st_mtime < trans_path.stat().st_mtime or not newfile:
+    for lang in languages:
+        language_name = lang_code_to_text(lang)
+        trans_path = path.parent / f"{path.stem}_{lang}{path.suffix}"
+        print(f"[{lang}] {path} ==> {trans_path}")
+        ppath = str(path)[-30:]
+        ptrans_path = str(trans_path)[-30:]
+        
+        # CHANGE DETECTION:
+        # Trigger "Nuclear Option" if:
+        # a) File doesn't exist
+        # b) Original is newer than the translation
+        needs_rebuild = not trans_path.exists() or (orig_mtime > trans_path.stat().st_mtime)
+        
+        if not needs_rebuild:
+            print(f"[{lang}] {ppath} ==> {ptrans_path}. Translation is up to date. Skipping.")
             continue
 
-        # Process
-        orig_prs = Presentation(file_path)
-        trans_prs = Presentation(trans_path)
+        print(f"[{lang}] {ppath} ==> {ptrans_path}. Updated or translation missing. Rebuilding...")
+        
+        # 1. CLONE: Fresh start with all visual/media elements intact
+        #shutil.copy2(path, trans_path) # copy2 preserves original metadata during copy
+        
+        print(f"[{lang}] Opening {ppath} for translation!")
 
-        # 1. Map slides by ID
-        orig_slides = {s.slide_id: s for s in orig_prs.slides}
-        trans_slides = {s.slide_id: s for s in trans_prs.slides}
+        # 2. PROCESS: Open the fresh clone
+        prs = Presentation(path)
 
-        with sqlite3.connect("translations.db") as conn:
-                cursor = conn.cursor()
+
+        ###############################################
+        # 3. COLLECT TEXTS TO TRANSLATE FROM ALL SLIDES
+        ###############################################
+        translate_now = []
+
+        for slide in prs.slides:
+            shape_map = {s.shape_id: s for s in slide.shapes if hasattr(s, "text")}
+            slide_data = get_slide_shapes(slide)
+            if not slide_data:
+                continue
                 
-                # 2. Update/Translate individual slides
-                for sid, slide in orig_slides.items():
-                    texts, current_hash = get_slide_content(slide)
-                    
-                    cursor.execute("SELECT id, content_hash FROM original_slides WHERE filename=? AND slide_id=?", (str(path), sid))
-                    row = cursor.fetchone()
-                    
-                    if not row:
-                        cursor.execute("INSERT INTO original_slides (filename, slide_id, content_hash, last_updated) VALUES (?, ?, ?, ?)",
-                                       (str(path), sid, current_hash, time.time()))
-                        db_orig_id = cursor.lastrowid
+            # 3.1 CHECK TLB
+            for shape_id, fingerprint in slide_data:
+                cursor.execute("SELECT EXISTS(SELECT 1 FROM tlb WHERE fingerprint=? AND lang_code=?)", (fingerprint,lang))
+                exists = cursor.fetchone()[0]  
+                if not exists:
+                    translate_now.append((shape_id, fingerprint, get_shape_markdown(shape_map[shape_id])))
+
+        ###############################################
+        # 4. TRANSLATE WITH AI IF NEEDED
+        ###############################################
+        all_done = True
+        if translate_now:
+            print(f"[{lang}] Calling AI for {len(translate_now)} new strings to translate!")
+                
+            # Batch translate the missing snippets
+            try:
+                ai_results = model.translate(translate_now, prompt, "Finnish", language_name)
+            except KeyboardInterrupt:
+                print("\n[STOP] Keyboard Interrupt detected! Saving current progress and exiting...")
+                ai_results = []
+                for (shape_id, fingerprint, original_md) in translate_now:
+                    ai_results.append((shape_id, fingerprint, original_md, None))
+            except Exception as e:
+                print(f"\n[ERROR] AI Translation failed unexpectedly: {e}")
+                ai_results = []
+                for (shape_id, fingerprint, original_md) in translate_now:
+                    ai_results.append((shape_id, fingerprint, original_md, None)) 
+    
+            # Open the SQL fix file in append mode
+            with open("fix_translations.sql", "a", encoding="utf-8") as sql_file:
+                for shape_id, fingerprint, original_markdown, translated_markdown in ai_results:
+                    if translated_markdown == "" or translated_markdown is None:
+                        #Translation failed for this string!
+                        all_done = False
+                        print("-" * 20)
+                        print(f"ERROR! AI provided no translation for string: {original_markdown}...")
+                        print("-" * 20)
+
+                        # --- Generate SQL Manual translation Line ---
+                        # We escape single quotes for SQL safety
+                        sql_orig = original_markdown.replace("'", "''")
+                        sql_file.write(f"/* INSERT MANUAL TRANSLATION!!!\n ORIG: {original_markdown}\n*/\n")
+                        sql_file.write(f"INSERT OR REPLACE INTO tlb (fingerprint, source_text, target_text, lang_code) VALUES ('{fingerprint}', '{original_markdown}', 'INSERT MANUAL TRANSLATION HERE', '{lang}');\n")
                     else:
-                        db_orig_id, old_hash = row
-                        if old_hash != current_hash:
-                            cursor.execute("UPDATE original_slides SET content_hash=?, last_updated=? WHERE id=?", 
-                                           (current_hash, time.time(), db_orig_id))
+                        # ---  Pretty Print succesfull translation to Shell ---
+                        # Using clean formatting for easy terminal reading
+                        print(f"  ORIG: {original_markdown[:100].replace(os.linesep, ' ')}...")
+                        print(f"  AI  : {translated_markdown[:100].replace(os.linesep, ' ')}...")
+            
+                        # --- Update TLB and commit ---
+                        cursor.execute(    
+                            "INSERT OR REPLACE INTO tlb (fingerprint, source_text, target_text, lang_code) VALUES (?, ?, ?, ?)",
+                            (fingerprint, original_markdown, translated_markdown, lang)
+                        )
+                        conn.commit()
 
-                    # 3. Check translation status
-                    cursor.execute("SELECT last_translated_hash FROM translated_slides WHERE orig_slide_id=? AND lang_code=?", (db_orig_id, lang))
-                    t_row = cursor.fetchone()
-                    
-                    if not t_row or t_row[0] != current_hash:
-                        print(f"[{lang}] Translating slide {sid}...")
-                        translated_texts = call_gemini_translate(model, texts, lang)
-                        
-                        if sid in trans_slides and translated_texts:
-                            target_slide = trans_slides[sid]
-                            text_idx = 0
-                            for shape in target_slide.shapes:
-                                if hasattr(shape, "text") and shape.text.strip():
-                                    if text_idx < len(translated_texts):
-                                        shape.text = translated_texts[text_idx]
-                                        text_idx += 1
-                        
-                        if not t_row:
-                            cursor.execute("INSERT INTO translated_slides (orig_slide_id, lang_code, last_translated_hash, last_updated) VALUES (?, ?, ?, ?)",
-                                           (db_orig_id, lang, current_hash, time.time()))
-                        else:
-                            cursor.execute("UPDATE translated_slides SET last_translated_hash=?, last_updated=? WHERE orig_slide_id=? AND lang_code=?",
-                                           (current_hash, time.time(), db_orig_id, lang))
+                        # --- Generate SQL Fix Line ---
+                        # We escape single quotes for SQL safety
+                        sql_orig = original_markdown.replace("'", "''")
+                        sql_trans = translated_markdown.replace("'", "''")            
+                        sql_file.write(f"/* FIX AND UNCOMMENT IF NECESSARY!!!\n ORIG: {original_markdown}\n CURRENT: {translated_markdown}*/\n")
+                        sql_file.write(f"/* UPDATE tlb SET target_text = '{sql_trans}' WHERE fingerprint = '{f_print}';*/\n")
+                sql_file.close()
 
-                #4.  Detect any orphaned (deleted) slides that are no longer in the original but persist in the translation and delete those slides. 
-                trans_ids = list(trans_slides.keys())
-                for sid in trans_ids:
-                    if sid not in orig_slides:
-                        print(f"[{lang}] Deleting orphaned slide {sid}...")
-                        # Remove from XML
-                        sldIdLst = trans_prs.slides._sldIdLst
-                        sldId = [s for s in sldIdLst if s.id == sid][0]
-                        sldIdLst.remove(sldId)
+        ###############################################
+        # 5. UPDATE FILE IF NOTHING MISSING
+        ###############################################
+        if all_done:
+            for slide in prs.slides:
+                shape_map = {s.shape_id: s for s in slide.shapes if hasattr(s, "text")}
+                slide_data = get_slide_shapes(slide)
+                if not slide_data:
+                    continue
+                
+                # Fetch translation from TLB
+                for shape_id, fingerprint in slide_data:
+                    cursor.execute("SELECT target_text FROM tlb WHERE fingerprint=?", (fingerprint,))
+                    row = cursor.fetchone()
+                    #push markdown into shape
+                    markdown_to_shape(shape_map[shape_id], row[0])            
 
-                conn.commit()
-
-            # 5. Check that the slide order is correct in the translated version in case of reorderings.
-            sync_slide_order(orig_prs, trans_prs)
-            trans_prs.save(trans_path)
-            print(f"Success: {trans_path} updated.")
-
-
-
+            prs.save(trans_path)
+            print(f"[{lang}] Successfully updated {trans_path.name}")
+        else:
+            # No translation, delete the translated file
+            # trans_path.unlink()
+            print(f"[{lang}] Translation for {trans_path.name} has failed, please insert manual translations to TLB!")
+    print("\n[CHECKPOINT] Press ENTER to process the next file, or Ctrl+C to stop here.")
+    input(">> ")
 
 
 #############################################################################
@@ -171,20 +184,23 @@ if __name__ == "__main__":
     (config, publications) = load_config()
     if not silent:
         print("Config loaded successfully!")
-    init_db()
-
-    genai.configure(api_key=config["gen_ai"]["API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    db = init_db()
+    
+    #Initialise genAI
+    model = getAI(AI=config["gen_ai"]["AI"],api_key=config["gen_ai"]["API_KEY"],model=config["gen_ai"]["Model"],timeout=config["gen_ai"]["Request_timeout_ms"],maxperminute=config["gen_ai"]["Max_requests_per_minute"])
 
     #For every publication
     for pub in publications:
         if not silent:
             print(f"Tarkistetaan {config[pub]['coursename']} - käännökset: {config[pub]['translate_to']}") 
+        if config[pub]['translate_to'] == "":
+            continue
+        languages = config[pub]['translate_to'].split(",")
         courseObject = create_course_object(config, pub)
         #Check headers etc.
-        translate_pptx(Path(courseObject.course_slides_dir) / config["settings"]["headerfile"], config[pub]['translate_to'])
-        translate_pptx(Path(courseObject.course_slides_dir) / config["settings"]["dividerfile"], config[pub]['translate_to'])
-        translate_pptx(Path(courseObject.course_slides_dir) / config["settings"]["footerfile"], config[pub]['translate_to'])
+        translate_pptx((Path(courseObject.course_slides_dir) / config["settings"]["headerfile"]).with_suffix(".pptx"), languages, config[pub]['ai_prompt'],model,db)
+        translate_pptx((Path(courseObject.course_slides_dir) / config["settings"]["dividerfile"]).with_suffix(".pptx"), languages,config[pub]['ai_prompt'], model,db)
+        translate_pptx((Path(courseObject.course_slides_dir) / config["settings"]["footerfile"]).with_suffix(".pptx"),  languages, config[pub]['ai_prompt'], model,db)
         # Read the lecture names and topics from the configuration, error if not enough lecture definitions are found:
         try:
             for x in range(1, courseObject.lectures+1):
@@ -198,7 +214,7 @@ if __name__ == "__main__":
         for n in range(1, courseObject.lectures+1):
             for topic in courseObject.lecture_list[n-1].topic_list:
                 topic = f"{topic}.pptx"
-                translate_pptx(Path(config['settings']['lecture_slides_dir']) / topic, config[pub]['translate_to'])
+                translate_pptx(Path(config['settings']['lecture_slides_dir']) / topic, languages, config[pub]['ai_prompt'], model,db)
             #publication-specific additional lecture slides
-            translate_pptx(Path(config['settings']['lecture_slides_dir']) / topic, config[pub]['translate_to'])
+            translate_pptx(Path(config['settings']['lecture_slides_dir']) / topic, languages, config[pub]['ai_prompt'], model,db)
 

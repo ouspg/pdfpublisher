@@ -1,4 +1,5 @@
 import argparse
+from database import init_db, connect_to_db
 from copy import deepcopy
 import sys
 import re
@@ -12,7 +13,7 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.lib import colors
 
-from classes import Course
+from classes import Course, create_course_object
 from config import load_config
 
 #############################################################################
@@ -98,18 +99,6 @@ def load_full_directory(directory):
         files[f.name]["file"] = f
         files[f.name]["modtime"] = mtime
     return files
-
-def create_course_object(config, pub):
-    courseObject = Course(config[pub]['coursecode'],
-                            config[pub]['coursesize'],
-                            int(config[pub]['lectures']),
-                            config[pub]['coursename'],
-                            config[pub]['filename_prefix'],
-                            config[pub]['lectureterm'],
-                            config[pub]['publish_dir'],
-                            config[pub]['course_slides_dir'])
-
-    return courseObject
 
 def link_health_check(config, pub, silent):
     if not silent:
@@ -207,9 +196,9 @@ if __name__ == "__main__":
             continue
 
         # Load header/footer slides
-        Startingslides = PdfReader(Path(courseObject.course_slides_dir) / config["settings"]["headerfile"])
-        Dividerslides = PdfReader(Path(courseObject.course_slides_dir) / config["settings"]["dividerfile"])
-        Endingslides = PdfReader(Path(courseObject.course_slides_dir) / config["settings"]["footerfile"])
+        Startingslides = PdfReader((Path(courseObject.course_slides_dir) / config["settings"]["headerfile"]).with_suffix(".pdf"))
+        Dividerslides = PdfReader((Path(courseObject.course_slides_dir) / config["settings"]["dividerfile"]).with_suffix(".pdf"))
+        Endingslides = PdfReader((Path(courseObject.course_slides_dir) / config["settings"]["footerfile"]).with_suffix(".pdf"))
 
         # Go through all or a subset of lectures
         for n in range(1, courseObject.lectures+1):

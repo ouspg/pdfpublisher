@@ -1,4 +1,5 @@
 import configparser
+from pathlib import Path
 import sys
 
 #############################################################################
@@ -11,13 +12,14 @@ FOOTER_FILE = "footer"
 # Required mandatory configurations
 REQUIRED_SETTINGS = {
     "settings": ["lecture_slides_dir","headerfile","footerfile","dividerfile"],	
-	"gen_ai": ["AI","API_KEY","Model","Request_timeout_ms","Max_requests_per_minute"],
+    "gen_ai": ["AI","API_KEY","Model","Request_timeout_ms","Max_requests_per_minute"],
     "titlefont": ["font","font_max_size","font_min_size","colour","maxlines"],
 }
 
 # Mandatory options for all publications
 PUBLICATION_OPTIONS = set(["coursecode",
 "translate_to",
+"ai_prompt",
 "publish_dir",
 "coursesize",
 "lectures",

@@ -1,3 +1,15 @@
+def create_course_object(config, pub):
+    courseObject = Course(config[pub]['coursecode'],
+                            config[pub]['coursesize'],
+                            int(config[pub]['lectures']),
+                            config[pub]['coursename'],
+                            config[pub]['filename_prefix'],
+                            config[pub]['lectureterm'],
+                            config[pub]['publish_dir'],  
+                            config[pub]['course_slides_dir'])
+    
+    return courseObject
+
 class Course:
     def __init__(self, coursecode: str, coursesize: str, lectures: int, name: str, filename_prefix: str, lectureterm: str, publication_dir: str, course_slides_dir: str):
         self.name = name
