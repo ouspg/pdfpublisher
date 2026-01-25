@@ -1,5 +1,4 @@
 import requests
-from database import 
 from datetime import datetime, timezone
 from typing import Set, Iterable, List, Tuple, Dict
 from pypdf import PdfReader
