@@ -10,9 +10,19 @@ header, footer and divider files: Which file should be used. This file should be
 ### Titlefont
 Fill these with what font, fontsize colour and maxlines you want to use
 
+### gen_ai
+Settings for calling generative AI
+- AI: name of the AI used, eg. Google
+- API_KEY: ...
+- Model: Model to be called
+- Request_timeout_ms: minimum timeout between calls
+- Max_requests_per_minute: maximum amount of requests per minute
+
 ### publications
 - These should be named as the name of the course and there can be as many as you want. They need to have the following:<br>
 - Coursecode: The code for the course<br>
+- ai_prompt: Prompt to describe this particular course for the AI
+- translate_to: language codes, separated by "," for translations, for example: en, sv for english and swedish translations
 - publish_dir: The teams folder where the course slides should be published.<br>
 - coursesize: description of the course size<br>
 - lectures: How many lectures the course contains<br>
