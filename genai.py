@@ -7,24 +7,25 @@ from google import genai as google_genai
 # --- CONFIGURATION ---
 AI_LIST = ["Google"]
 
-def getAI(AI, api_key, model, timeout=30, maxperminute=15):
+def getAI(AI, api_key, model, timeout=30, maxperminute=15,minimum_translations=1):
     """Factory function to return the correct AI instance."""
     if AI not in AI_LIST:
         print(f"[ERROR] AI '{AI}' is not on the list")
         sys.exit(1)
     
     if AI == "Google":
-        return GoogleAI(api_key=api_key, model=model, timeout=timeout, maxperminute=maxperminute)
+        return GoogleAI(api_key=api_key, model=model, timeout=timeout, maxperminute=maxperminute,minimum_translations=minimum_translations)
     # Copypaste and implement for other AI's
 
 
 # --- Parent Class ---
 class AIwrapper:
-    def __init__(self, api_key, model, timeout, maxperminute):
+    def __init__(self, api_key, model, timeout, maxperminute, minimum_translations):
         self.api_key = api_key
         self.model = model
         self.timeout = int(timeout)
         self.maxperminute = int(maxperminute)
+        self.minimum_translations = int(minimum_translations)
         self.last_call_time = 0
 
     def _throttle(self):
@@ -42,30 +43,49 @@ class AIwrapper:
         # Using structured prompts
         translate_prompt = (
             f"You are a professional translator for our university course content internationalisation project. I need a translations for my course material. {course_prompt}. "
-            f"Translate the following Markdown content from {source_lang} to {target_lang}."
-            f"Preserve all Markdown formatting including bold, italics, and links. Do not change the structure of the lists. Ensure the translated text remains natural."
-            f"Return ONLY a JSON list of strings in the exact same order and remember to retain the line breaks."
+            f"The input is a list of [fingerprint, original_text, empty_translation_slot]. Fill the third column (the empty string) with the translation from {source_lang} to {target_lang}. Do not modify the fingerprints or the original text. Return only the valid JSON array."
+            f"Preserve all Markdown formatting including bold, italics, and links and additionally remember to retain line breaks."
+            f"Return ONLY the JSON array, with the translations filled in!\n\nJSON ARRAY TO FILL WITH THE TRANSLATIONS:\n\n"
         )
         texts_only = [item[2] for item in to_translate]
+        structured_input = [
+            {"id": item[1], "text": item[2], "translation": ""} 
+            for item in to_translate
+            ]
         
-        # Call the subclass implementation of prompt()
+        # Call the subclass implementation of prompt(), if there is enough to translate
+        # Store results to log 
         # We pass texts as content parts to keep the prompt clean
-        ai_response = self.prompt(translate_prompt, texts_only)
-        
-        retlist = []
-        fail = len(ai_response) != len(to_translate)
-        for i, (shape_id, fingerprint, original_md) in enumerate(to_translate):
-            if fail:
-                retlist.append((shape_id, fingerprint, original_md, None))
+        textcount = len(texts_only)
+        with open("ai_responses.log", "a", encoding="utf-8") as logfile:
+            logfile.write("***************************************************\n")
+            logfile.write(f"{translate_prompt}")
+            json_input = json.dumps(structured_input, ensure_ascii=False, indent=2)
+            logfile.write(f"{json_input}")
+            logfile.write("***************************************************\n")
+            if textcount >= self.minimum_translations:
+                ai_response = self.prompt(translate_prompt, structured_input)
+                logfile.write("--------------------\n")
+                logfile.write(f"{ai_response}")
+                logfile.write("\n--------------------\n")
+                logfile.close()
             else:
-                retlist.append((shape_id, fingerprint, original_md, ai_response[i]))
-        return retlist
+                print("Not enough to translate: should have minimum {self.minimum_translations} texts, but only {textcount} given.")
+                ai_response = structured_input
+        #retlist = []
+        #fail = len(ai_response) != len(to_translate)
+        #for i, (shape_id, fingerprint, original_md) in enumerate(to_translate):
+        #    if fail:
+        #        retlist.append((shape_id, fingerprint, original_md, None))
+        #    else:
+        #        retlist.append((shape_id, fingerprint, original_md, ai_response[i]))
+        return ai_response
 
 # --- Google Implementation ---
 class GoogleAI(AIwrapper):
-    def __init__(self, api_key, model, timeout, maxperminute):
+    def __init__(self, api_key, model, timeout, maxperminute, minimum_translations):
         # Initialize the Parent
-        super().__init__(api_key, model, timeout, maxperminute)
+        super().__init__(api_key, model, timeout, maxperminute, minimum_translations)
         
         # Setup Google Client
         try:
@@ -80,23 +100,31 @@ class GoogleAI(AIwrapper):
             print(f"[ERROR] Failed to connect to Google AI: {e}")
             sys.exit(1)
 
-    def prompt(self, system_instruction, user_texts, max_retries=5):
+    def prompt(self, system_instruction, request_data, max_retries=5):
         """Google-specific implementation using explicit API retry hints."""
 
         # 1. Prepare the mirrored input structure
         # We turn the list into a JSON string so the AI sees it as a single 'object' to translate
-        size = len(user_texts)
-        json_input = json.dumps(user_texts, ensure_ascii=False)
+        size = len(request_data)
+        json_input = json.dumps(request_data, ensure_ascii=False)
 
-        full_prompt = f"{system_instruction}\n\nJSON INPUT DATA TO TRANSLATE:\n{json_input}"   
-        print(f"Full prompt is: {full_prompt}")
+        full_prompt = f"{system_instruction}{json_input}"   
+        #print(f"Full prompt is: {full_prompt}")
+
         strict_schema = {
-            "type": "ARRAY", 
-            "items": {"type": "STRING"}, 
-            "minItems": size, 
-            "maxItems": size
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "id": {"type": "STRING"},
+                    "text": {"type": "STRING"},
+                    "translation": {"type": "STRING"}
+                },
+                "required": ["id", "text", "translation"]
+            }
         }
-        sys.stdout.flush()
+
+        #sys.stdout.flush()
         for attempt in range(max_retries):
             self._throttle()
             try:

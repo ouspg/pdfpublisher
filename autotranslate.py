@@ -12,7 +12,7 @@ import sys
 from database import init_db
 from pathlib import Path
 from pptx import Presentation
-from pptxhandler import get_slide_shapes, get_shape_markdown, markdown_to_shape
+from pptxhandler import get_slide_shapes, get_shape_markdown, markdown_to_shape, is_smart_art
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from classes import Course, create_course_object
 
@@ -62,9 +62,9 @@ def translate_pptx(file_path, languages, prompt, model, conn):
         # 1. CLONE: Fresh start with all visual/media elements intact
         #shutil.copy2(path, trans_path) # copy2 preserves original metadata during copy
         
-        print(f"[{lang}] Opening {ppath} for translation!")
+        print(f"[{lang}] Opening {path} to make a translated copy!")
 
-        # 2. PROCESS: Open the fresh clone
+        # 2. PROCESS: Open the original for editing (save only on success)
         prs = Presentation(path)
 
 
@@ -73,8 +73,10 @@ def translate_pptx(file_path, languages, prompt, model, conn):
         ###############################################
         translate_now = []
 
+        n = 1
         for slide in prs.slides:
-            shape_map = {s.shape_id: s for s in slide.shapes if hasattr(s, "text")}
+            print(f"Slide {n}...")
+            shape_map = {s.shape_id: s for s in slide.shapes if hasattr(s, "text") or is_smart_art(s)}
             slide_data = get_slide_shapes(slide)
             if not slide_data:
                 continue
@@ -85,7 +87,7 @@ def translate_pptx(file_path, languages, prompt, model, conn):
                 exists = cursor.fetchone()[0]  
                 if not exists:
                     translate_now.append((shape_id, fingerprint, get_shape_markdown(shape_map[shape_id])))
-
+            n += 1
         ###############################################
         # 4. TRANSLATE WITH AI IF NEEDED
         ###############################################
@@ -100,47 +102,46 @@ def translate_pptx(file_path, languages, prompt, model, conn):
                 print("\n[STOP] Keyboard Interrupt detected! Saving current progress and exiting...")
                 ai_results = []
                 for (shape_id, fingerprint, original_md) in translate_now:
-                    ai_results.append((shape_id, fingerprint, original_md, None))
+                    ai_results.append({"id": fingerprint, "text": original_md, "translation": None})
             except Exception as e:
                 print(f"\n[ERROR] AI Translation failed unexpectedly: {e}")
                 ai_results = []
                 for (shape_id, fingerprint, original_md) in translate_now:
-                    ai_results.append((shape_id, fingerprint, original_md, None)) 
-    
+                    ai_results.append({"id": fingerprint, "text": original_md, "translation": None})
+
             # Open the SQL fix file in append mode
             with open("fix_translations.sql", "a", encoding="utf-8") as sql_file:
-                for shape_id, fingerprint, original_markdown, translated_markdown in ai_results:
-                    if translated_markdown == "" or translated_markdown is None:
+                #for shape_id, fingerprint, original_markdown, translated_markdown in ai_results:
+                for entry in ai_results:
+                    if entry["translation"] == "" or entry["translation"] is None:
                         #Translation failed for this string!
                         all_done = False
-                        print("-" * 20)
-                        print(f"ERROR! AI provided no translation for string: {original_markdown}...")
-                        print("-" * 20)
+                        print(f"ERROR! AI provided no translation for string: '{entry["text"][:60]}...'")
 
                         # --- Generate SQL Manual translation Line ---
                         # We escape single quotes for SQL safety
-                        sql_orig = original_markdown.replace("'", "''")
-                        sql_file.write(f"/* INSERT MANUAL TRANSLATION!!!\n ORIG: {original_markdown}\n*/\n")
-                        sql_file.write(f"INSERT OR REPLACE INTO tlb (fingerprint, source_text, target_text, lang_code) VALUES ('{fingerprint}', '{original_markdown}', 'INSERT MANUAL TRANSLATION HERE', '{lang}');\n")
+                        sql_orig = entry['text'].replace("'", "''")
+                        sql_file.write(f"/* INSERT MANUAL TRANSLATION!!!\n ORIG: {entry["text"]}\n*/\n")
+                        sql_file.write(f"INSERT OR REPLACE INTO tlb (fingerprint, source_text, target_text, lang_code) VALUES ('{entry["id"]}', '{entry["text"]}', 'INSERT MANUAL TRANSLATION HERE', '{lang}');\n")
                     else:
                         # ---  Pretty Print succesfull translation to Shell ---
                         # Using clean formatting for easy terminal reading
-                        print(f"  ORIG: {original_markdown[:100].replace(os.linesep, ' ')}...")
-                        print(f"  AI  : {translated_markdown[:100].replace(os.linesep, ' ')}...")
+                        #print(f"  ORIG: {original_markdown[:100].replace(os.linesep, ' ')}...")
+                        #print(f"  AI  : {translated_markdown[:100].replace(os.linesep, ' ')}...")
             
                         # --- Update TLB and commit ---
                         cursor.execute(    
                             "INSERT OR REPLACE INTO tlb (fingerprint, source_text, target_text, lang_code) VALUES (?, ?, ?, ?)",
-                            (fingerprint, original_markdown, translated_markdown, lang)
+                            (entry["id"], entry["text"], entry["translation"], lang)
                         )
                         conn.commit()
 
                         # --- Generate SQL Fix Line ---
                         # We escape single quotes for SQL safety
-                        sql_orig = original_markdown.replace("'", "''")
-                        sql_trans = translated_markdown.replace("'", "''")            
-                        sql_file.write(f"/* FIX AND UNCOMMENT IF NECESSARY!!!\n ORIG: {original_markdown}\n CURRENT: {translated_markdown}*/\n")
-                        sql_file.write(f"/* UPDATE tlb SET target_text = '{sql_trans}' WHERE fingerprint = '{f_print}';*/\n")
+                        sql_orig = entry['text'].replace("'", "''")
+                        sql_trans = entry['translation'].replace("'", "''")            
+                        sql_file.write(f"/* FIX AND UNCOMMENT IF NECESSARY!!!\n ORIG: {entry['text']}\n CURRENT: {entry['translation']}*/\n")
+                        sql_file.write(f"/* UPDATE tlb SET target_text = '{sql_trans}' WHERE fingerprint = '{entry['id']}';*/\n")
                 sql_file.close()
 
         ###############################################
@@ -187,7 +188,7 @@ if __name__ == "__main__":
     db = init_db()
     
     #Initialise genAI
-    model = getAI(AI=config["gen_ai"]["AI"],api_key=config["gen_ai"]["API_KEY"],model=config["gen_ai"]["Model"],timeout=config["gen_ai"]["Request_timeout_ms"],maxperminute=config["gen_ai"]["Max_requests_per_minute"])
+    model = getAI(AI=config["gen_ai"]["AI"],api_key=config["gen_ai"]["API_KEY"],model=config["gen_ai"]["Model"],timeout=config["gen_ai"]["Request_timeout_ms"],maxperminute=config["gen_ai"]["Max_requests_per_minute"],minimum_translations=config["gen_ai"]["Minimum_translations"])
 
     #For every publication
     for pub in publications:
@@ -216,5 +217,5 @@ if __name__ == "__main__":
                 topic = f"{topic}.pptx"
                 translate_pptx(Path(config['settings']['lecture_slides_dir']) / topic, languages, config[pub]['ai_prompt'], model,db)
             #publication-specific additional lecture slides
-            translate_pptx(Path(config['settings']['lecture_slides_dir']) / topic, languages, config[pub]['ai_prompt'], model,db)
+            translate_pptx(next(Path(config[pub]['course_slides_dir']).glob(f"*{n:02d}*.pptx"),None), languages, config[pub]['ai_prompt'], model,db)
 
