@@ -11,9 +11,14 @@ from pypdf._page import PageObject
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.lib import colors
-
 from classes import Course
 from config import load_config
+
+BOLD = "\033[1m"
+RESET = "\033[0m"
+RED = "\033[31m"
+WHITE = "\033[37m"
+GREEN = "\033[32m"
 
 #############################################################################
 # Tekstin lisäys otsikkosivulle
@@ -181,9 +186,34 @@ def publish_lectures(courseObject,config,lang):
             suffix = ".pdf"
         # Load header/footer slides
         # Should be moved to courseObject class to remove need to pass config here...
-        Startingslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config['settings']['headerfile']}{suffix}")
-        Dividerslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config['settings']['dividerfile']}{suffix}")
-        Endingslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config['settings']['footerfile']}{suffix}")
+
+        pStartingslides = Path(courseObject.course_slides_dir) / f"{config['settings']['headerfile']}{suffix}"
+        pDividerslides = Path(courseObject.course_slides_dir) / f"{config['settings']['dividerfile']}{suffix}"
+        pEndingslides = Path(courseObject.course_slides_dir) / f"{config['settings']['footerfile']}{suffix}"
+
+        
+        aOK = pStartingslides.exists()
+        kOK = pDividerslides.exists()
+        lOK = pEndingslides.exists()
+        if aOK and kOK and lOK:
+            Startingslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config['settings']['headerfile']}{suffix}")
+            Dividerslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config['settings']['dividerfile']}{suffix}")
+            Endingslides = PdfReader(Path(courseObject.course_slides_dir) / f"{config['settings']['footerfile']}{suffix}")
+        else:
+            print(f"  \_{RED}Otsikkokalvoja ei ole vielä saatavilla! {RESET}")
+            if aOK:
+                print(f"    \_{GREEN}Aloituskalvo ok{RESET}")
+            else:
+                print(f"    \_{RED}Aloituskalvo puuttuu{RESET}")
+            if kOK:
+                print(f"    \_{GREEN}Välikalvo ennen tehtäviä ok{RESET}")
+            else:
+                print(f"    \_{RED}Välikalvo ennen tehtäviä puuttuu{RESET}")
+            if lOK:
+                print(f"    \_{GREEN}Lopetuskalvo ok{RESET}")
+            else:
+                print(f"    \_{RED}Lopetuskalvo puuttuu{RESET}")
+            return
 
         # Go through all or a subset of lectures
         for n in range(1, courseObject.lectures+1):
@@ -200,32 +230,36 @@ def publish_lectures(courseObject,config,lang):
             # First check the slides, later additional materials
             updateFlag = False
             missingSlides = False
+
             for topic in courseObject.lecture_list[n-1].topic_list:
                 topic = f"{topic}{suffix}"
                 if not topic in slide_updates:
-                    print(f"    \_Aihe {topic}: luentokalvot eivät vielä saatavilla")
-                    #print(f"Luentomateriaali {n} -> Aihe {topic}: luentokalvot eivät vielä saatavilla")
+                    print(f"    \_{RED}Aihe {topic}: luentokalvot eivät vielä saatavilla{RESET}")
                     missingSlides = True
-                elif published_slides.exists() and slide_updates[topic]["modtime"] <= published_slides.stat().st_mtime and pubslides[n]["modtime"] <= published_slides.stat().st_mtime:
+                elif published_slides.exists() and slide_updates[topic]["modtime"] <= published_slides.stat().st_mtime:
                     if not silent:
-                        print(f"    \_Aihe {topic}: ajan tasalla!")
-                        #print(f"Luentomateriaali {n} -> Aihe {topic}: ajan tasalla")
+                        print(f"    \_{WHITE}Aihe {topic}: ajan tasalla!{RESET}")
                 else:
                     if not silent:
-                        print(f"    \_Aihe {topic}: luentokalvot päivitetty, voi julkaista!")
+                        print(f"    \_{BOLD}Aihe {topic}: luentokalvot päivitetty, voi julkaista!{RESET}")
                     updateFlag = True
             if not n in pubslides:
-                print(f"    \_kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
-                #print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n}: kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!")	    
-            elif updateFlag and not missingSlides:
+                print(f"    \_{RED}Kurssikohtaiset täydentävät kalvot eivät vielä saatavilla!{RESET}")	    
+                missingSlides = True
+            elif published_slides.exists() and pubslides[n]["modtime"] <= published_slides.stat().st_mtime:
+                if not silent:
+                    print(f"    \_{WHITE}Kurssikohtaiset täydentävät kalvot ajan tasalla!{RESET}")
+            else:
+                if not silent:
+                    print(f"    \_{BOLD}Kurssikohtaiset täydentävät kalvot päivitetty, voi julkaista!{RESET}")
+                updateFlag = True
+            if updateFlag and not missingSlides:
                 if not published_slides.exists():
                     if not silent:
-                        #print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n}: ei vielä julkaistu -> julkaistaan")
-                        print(f"    \_Ei vielä julkaistu -> julkaistaan")
+                        print(f"    \_{BOLD}Ei vielä julkaistu -> julkaistaan{RESET}")
                 else:
                     if not silent:
-                        #print(f"Luentomateriaali {n} -> {courseObject.lectureterm} {n} on päivitetty -> julkaistaan")
-                        print(f"    \_Materiaalia on päivitetty -> julkaistaan")
+                        print(f"    \_{BOLD}Materiaalia on päivitetty -> julkaistaan{RESET}")
                 newslides = PdfWriter()
 
                     # Take starting slide, update course and lecture name
@@ -258,7 +292,7 @@ def publish_lectures(courseObject,config,lang):
                 # Write to file
                 if not silent:
                     #print("Luodaan pdf...")
-                    print(f"    \_Tallennetaan PDF")
+                    print(f"    \_{BOLD}Tallennetaan PDF{RESET}")
                 filename = re.sub(r'[\\/]', '', f"{n:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {n}: {courseObject.lecture_list[n-1].name}{suffix}")[:200]
                 with open(published_slides,"wb") as f:
                     newslides.write(f)
@@ -283,27 +317,27 @@ def publish_materials(courseObject,config):
             for filename, file in materials_for_all.items():
                 if filename not in materials_published:
                     if not silent:
-                        print(f"    \_Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.")
+                        print(f"    \_{BOLD}Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.{RESET}")
                     shutil.copy2(file['file'], matpubpath / filename)
                 elif file["modtime"] > materials_published[filename]["modtime"]:
                     if not silent:
-                        print(f"    \_Tiedostosta {filename} on uudempi versio, julkaistaan.")
+                        print(f"    \_{BOLD}Tiedostosta {filename} on uudempi versio, julkaistaan.{RESET}")
                     shutil.copy2(file['file'], materials_published[filename]["file"])
                 else:
                     if not silent:
-                        print(f"    \_Tiedosto {filename} on ajan tasalla")
+                        print(f"    \_{WHITE}Tiedosto {filename} on ajan tasalla{RESET}")
             for filename, file in materials_forcourse.items():
                 if filename not in materials_published:
                     if not silent:
-                        print(f"    \_Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.")
+                        print(f"    \_{BOLD}Tiedostoa {filename} ei ole vielä julkaistu, julkaistaan.{RESET}")
                     shutil.copy2(file['file'], matpubpath / filename)
                 elif file["modtime"] > materials_published[filename]["modtime"]:
                     if not silent:
-                        print(f"    \_Tiedostosta {filename} on uudempi versio, julkaistaan.")
+                        print(f"    \_{BOLD}Tiedostosta {filename} on uudempi versio, julkaistaan.{RESET}")
                     shutil.copy2(file['file'], materials_published[filename]["file"])
                 else:
                     if not silent:
-                        print(f"    \_Tiedosto {filename} on ajan tasalla")
+                        print(f"    \_{WHITE}Tiedosto {filename} on ajan tasalla{RESET}")
 
     
 #############################################################################
