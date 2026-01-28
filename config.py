@@ -12,7 +12,7 @@ FOOTER_FILE = "footer"
 # Required mandatory configurations
 REQUIRED_SETTINGS = {
 	"settings": ["lecture_slides_dir","headerfile","footerfile","dividerfile"],
-	"gen_ai": ["AI","API_KEY","Model","Minimum_translations","Request_timeout_ms","Max_requests_per_minute"],
+	"gen_ai": ["AI","API_KEY","model","batch_size","request_timeout_ms","max_requests_per_minute"],
         "titlefont": ["font","font_max_size","font_min_size","colour","maxlines"]
 }
 

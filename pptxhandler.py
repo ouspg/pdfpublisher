@@ -1,6 +1,8 @@
 import re
 from hashlib import md5
 from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.enum.text import MSO_AUTO_SIZE
+from pptx.util import Pt
 
 def get_slide_shapes(slide):
     """Returns a list of (shape_id, fingerprint) for elements with text."""                
@@ -51,26 +53,11 @@ def markdown_to_smart_art(shape, translated_markdown):
     nodes = [n for n in smart_art.nodes if n.text_frame]
 
     # 4. Map 1-to-1
-    for i in range(min(len(nodes), len(clean_texts))):
-        # Option A: Simple plain text (Use this if you don't have links)
-        # nodes[i].text_frame.text = clean_texts[i]
-        
-        # Option B: Call a helper to handle formatting/links (Recommended)
-        apply_markdown_to_text_frame(nodes[i].text_frame, clean_texts[i])
-
-def apply_markdown_to_text_frame(text_frame, markdown_line):
-    """
-    Simplistic helper to set text. 
-    Can be expanded to parse [text](url) into actual hyperlinks.
-    """
-    # For now, let's just strip markdown bold/italic and set text
-    clean_val = re.sub(r'\*\*|__|_|\*', '', markdown_line)
-    
-    # If there are links [text](url), this regex picks the text part
-    # You can expand this to actually apply run.hyperlink.address
-    clean_val = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', clean_val)
-    
-    text_frame.text = clean_val
+    #for i in range(min(len(nodes), len(clean_texts))):
+    #    # Option A: Simple plain text (Use this if you don't have links)
+    #    # nodes[i].text_frame.text = clean_texts[i]
+    #    # Option B: Call a helper to handle formatting/links (Recommended)
+    #    #apply_markdown_to_text_frame(nodes[i].text_frame, clean_texts[i])
 
 def markdown_to_text_shape(shape, markdown_text):
     """Parses Markdown and applies it to a PowerPoint shape."""
@@ -78,8 +65,37 @@ def markdown_to_text_shape(shape, markdown_text):
         return
 
     text_frame = shape.text_frame
-    text_frame.clear() # Wipe existing content
+
+    # 1. Capture original font sizes and colours
+    sizes = []
+    color_rgb = None
+    color_theme = None
+
+    for paragraph in text_frame.paragraphs:
+        for run in paragraph.runs:
+            clean_text = run.text.strip()
+            if not clean_text:
+                continue
+            if run.font.size:
+                sizes.append(run.font.size.pt)
+            # Capture color if not already found
+            if not color_rgb and not color_theme:
+                if run.font.color.type: # Check if color is defined
+                    color_theme = run.font.color.theme_color
+                    try:
+                        color_rgb = run.font.color.rgb
+                    except AttributeError:
+                        color_rgb = None
     
+    # Fallback to a standard size if no font info was found (e.g., empty box)
+    avg_size = sum(sizes) / len(sizes) if sizes else 18
+
+    text_frame.clear() # Wipe existing content
+    #Set autosize    
+    #text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    #text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+    #text_frame.word_wrap = True
+
     lines = markdown_text.split('\n')
     
     for i, line in enumerate(lines):
@@ -117,6 +133,13 @@ def markdown_to_text_shape(shape, markdown_text):
                 run.hyperlink.address = link_url
             else:
                 run.text = part
+            # 5. Re-apply Size and Colour
+            run.font.size = Pt(avg_size)
+            if color_theme:
+                run.font.color.theme_color = color_theme
+            elif color_rgb:
+                run.font.color.rgb = color_rgb
+
 
 
 def get_shape_markdown(shape):
@@ -153,7 +176,7 @@ def get_shape_as_markdown(shape):
             except (KeyError, AttributeError):
                 # This happens if the rId is missing in the slide's .rels file
                 # or if the hyperlink is malformed
-                print(f"  [WARN] Broken hyperlink detected in shape {shape.shape_id}. Skipping link.")
+                print(f"  [WARN] Broken hyperlink detected in shape {shape.shape_id} run: {text}. Skipping link.")
             md_runs += text
         
         # Handle Bullet Levels (Basic)

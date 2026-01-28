@@ -7,25 +7,24 @@ from google import genai as google_genai
 # --- CONFIGURATION ---
 AI_LIST = ["Google"]
 
-def getAI(AI, api_key, model, timeout=30, maxperminute=15,minimum_translations=1):
+def getAI(AI, api_key, model, timeout=30, maxperminute=15):
     """Factory function to return the correct AI instance."""
     if AI not in AI_LIST:
         print(f"[ERROR] AI '{AI}' is not on the list")
         sys.exit(1)
     
     if AI == "Google":
-        return GoogleAI(api_key=api_key, model=model, timeout=timeout, maxperminute=maxperminute,minimum_translations=minimum_translations)
+        return GoogleAI(api_key=api_key, model=model, timeout=timeout, maxperminute=maxperminute)
     # Copypaste and implement for other AI's
 
 
 # --- Parent Class ---
 class AIwrapper:
-    def __init__(self, api_key, model, timeout, maxperminute, minimum_translations):
+    def __init__(self, api_key, model, timeout, maxperminute):
         self.api_key = api_key
         self.model = model
         self.timeout = int(timeout)
         self.maxperminute = int(maxperminute)
-        self.minimum_translations = int(minimum_translations)
         self.last_call_time = 0
 
     def _throttle(self):
@@ -47,45 +46,29 @@ class AIwrapper:
             f"Preserve all Markdown formatting including bold, italics, and links and additionally remember to retain line breaks."
             f"Return ONLY the JSON array, with the translations filled in!\n\nJSON ARRAY TO FILL WITH THE TRANSLATIONS:\n\n"
         )
-        texts_only = [item[2] for item in to_translate]
-        structured_input = [
-            {"id": item[1], "text": item[2], "translation": ""} 
-            for item in to_translate
-            ]
         
         # Call the subclass implementation of prompt(), if there is enough to translate
         # Store results to log 
         # We pass texts as content parts to keep the prompt clean
-        textcount = len(texts_only)
+        textcount = len(to_translate)
         with open("ai_responses.log", "a", encoding="utf-8") as logfile:
             logfile.write("***************************************************\n")
             logfile.write(f"{translate_prompt}")
-            json_input = json.dumps(structured_input, ensure_ascii=False, indent=2)
+            json_input = json.dumps(to_translate, ensure_ascii=False, indent=2)
             logfile.write(f"{json_input}")
             logfile.write("***************************************************\n")
-            if textcount >= self.minimum_translations:
-                ai_response = self.prompt(translate_prompt, structured_input)
-                logfile.write("--------------------\n")
-                logfile.write(f"{ai_response}")
-                logfile.write("\n--------------------\n")
-                logfile.close()
-            else:
-                print("Not enough to translate: should have minimum {self.minimum_translations} texts, but only {textcount} given.")
-                ai_response = structured_input
-        #retlist = []
-        #fail = len(ai_response) != len(to_translate)
-        #for i, (shape_id, fingerprint, original_md) in enumerate(to_translate):
-        #    if fail:
-        #        retlist.append((shape_id, fingerprint, original_md, None))
-        #    else:
-        #        retlist.append((shape_id, fingerprint, original_md, ai_response[i]))
+            ai_response = self.prompt(translate_prompt, to_translate)
+            logfile.write("--------------------\n")
+            logfile.write(f"{ai_response}")
+            logfile.write("\n--------------------\n")
+            logfile.close()
         return ai_response
 
 # --- Google Implementation ---
 class GoogleAI(AIwrapper):
-    def __init__(self, api_key, model, timeout, maxperminute, minimum_translations):
+    def __init__(self, api_key, model, timeout, maxperminute):
         # Initialize the Parent
-        super().__init__(api_key, model, timeout, maxperminute, minimum_translations)
+        super().__init__(api_key, model, timeout, maxperminute)
         
         # Setup Google Client
         try:

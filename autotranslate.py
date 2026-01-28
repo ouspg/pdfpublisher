@@ -9,6 +9,8 @@ import copy
 import json
 import time
 import sys
+import re
+from itertools import batched
 from database import init_db
 from pathlib import Path
 from pptx import Presentation
@@ -30,10 +32,10 @@ def lang_code_to_text(code):
 
 
 #############################################################################
-# TRANSLATION
+# TEXT COLLECTION FOR TRANSLATION
 #############################################################################
 
-def translate_pptx(file_path, languages, prompt, model, conn):
+def collect_texts_from_pptx(file_path, languages,conn,list_of_texts):
     path = Path(file_path)
     cursor = conn.cursor()
     
@@ -43,7 +45,6 @@ def translate_pptx(file_path, languages, prompt, model, conn):
     for lang in languages:
         language_name = lang_code_to_text(lang)
         trans_path = path.parent / f"{path.stem}_{lang}{path.suffix}"
-        print(f"[{lang}] {path} ==> {trans_path}")
         ppath = str(path)[-30:]
         ptrans_path = str(trans_path)[-30:]
         
@@ -51,31 +52,22 @@ def translate_pptx(file_path, languages, prompt, model, conn):
         # Trigger "Nuclear Option" if:
         # a) File doesn't exist
         # b) Original is newer than the translation
-        needs_rebuild = not trans_path.exists() or (orig_mtime > trans_path.stat().st_mtime)
+        needs_rebuild = (not trans_path.exists()) or (orig_mtime > trans_path.stat().st_mtime)
         
         if not needs_rebuild:
             print(f"[{lang}] {ppath} ==> {ptrans_path}. Translation is up to date. Skipping.")
             continue
 
-        print(f"[{lang}] {ppath} ==> {ptrans_path}. Updated or translation missing. Rebuilding...")
-        
-        # 1. CLONE: Fresh start with all visual/media elements intact
-        #shutil.copy2(path, trans_path) # copy2 preserves original metadata during copy
-        
-        print(f"[{lang}] Opening {path} to make a translated copy!")
-
-        # 2. PROCESS: Open the original for editing (save only on success)
+        print(f"[{lang}] {ppath} ==> {ptrans_path}. Updated or translation missing. Collecting strings to translate...")
         prs = Presentation(path)
 
-
         ###############################################
-        # 3. COLLECT TEXTS TO TRANSLATE FROM ALL SLIDES
+        # COLLECT TEXTS TO TRANSLATE FROM ALL SLIDES
         ###############################################
-        translate_now = []
 
         n = 1
         for slide in prs.slides:
-            print(f"Slide {n}...")
+            #print(f"Slide {n}...")
             shape_map = {s.shape_id: s for s in slide.shapes if hasattr(s, "text") or is_smart_art(s)}
             slide_data = get_slide_shapes(slide)
             if not slide_data:
@@ -86,28 +78,43 @@ def translate_pptx(file_path, languages, prompt, model, conn):
                 cursor.execute("SELECT EXISTS(SELECT 1 FROM tlb WHERE fingerprint=? AND lang_code=?)", (fingerprint,lang))
                 exists = cursor.fetchone()[0]  
                 if not exists:
-                    translate_now.append((shape_id, fingerprint, get_shape_markdown(shape_map[shape_id])))
-            n += 1
-        ###############################################
-        # 4. TRANSLATE WITH AI IF NEEDED
-        ###############################################
-        all_done = True
-        if translate_now:
-            print(f"[{lang}] Calling AI for {len(translate_now)} new strings to translate!")
+                    list_of_texts[lang].append( {"id": fingerprint, "text": get_shape_markdown(shape_map[shape_id]), "translation": ""})
+            #n += 1
+
+#############################################################################
+# TRANSLATION OF TEXT BATCHES
+#############################################################################
+
+def translate_texts(translation_texts, batch_size, prompt, model, conn):
+
+    cursor = conn.cursor()
+    
+    for lang, texts in translation_texts.items():
+        language_name = lang_code_to_text(lang)
+        # Determine suitable batch size
+        L = len(texts)
+        if L == 0:
+            continue
+        if batch_size >= L:
+            B = L
+        else:
+            B = batch_size
+            while 0 < (L%B) < (B/2):
+                B += 1 
+        
+        print(f"[{lang}] Calling AI for {L} new strings in batches of {B} to translate!")
                 
+        for translate_now in batched(texts, B):
             # Batch translate the missing snippets
             try:
                 ai_results = model.translate(translate_now, prompt, "Finnish", language_name)
             except KeyboardInterrupt:
-                print("\n[STOP] Keyboard Interrupt detected! Saving current progress and exiting...")
+                print("\n[STOP] Keyboard Interrupt detected!")
                 ai_results = []
-                for (shape_id, fingerprint, original_md) in translate_now:
-                    ai_results.append({"id": fingerprint, "text": original_md, "translation": None})
+                ai_results = translate_now
             except Exception as e:
                 print(f"\n[ERROR] AI Translation failed unexpectedly: {e}")
-                ai_results = []
-                for (shape_id, fingerprint, original_md) in translate_now:
-                    ai_results.append({"id": fingerprint, "text": original_md, "translation": None})
+                ai_results = translate_now
 
             # Open the SQL fix file in append mode
             with open("fix_translations.sql", "a", encoding="utf-8") as sql_file:
@@ -115,7 +122,6 @@ def translate_pptx(file_path, languages, prompt, model, conn):
                 for entry in ai_results:
                     if entry["translation"] == "" or entry["translation"] is None:
                         #Translation failed for this string!
-                        all_done = False
                         print(f"ERROR! AI provided no translation for string: '{entry["text"][:60]}...'")
 
                         # --- Generate SQL Manual translation Line ---
@@ -124,11 +130,6 @@ def translate_pptx(file_path, languages, prompt, model, conn):
                         sql_file.write(f"/* INSERT MANUAL TRANSLATION!!!\n ORIG: {entry["text"]}\n*/\n")
                         sql_file.write(f"INSERT OR REPLACE INTO tlb (fingerprint, source_text, target_text, lang_code) VALUES ('{entry["id"]}', '{entry["text"]}', 'INSERT MANUAL TRANSLATION HERE', '{lang}');\n")
                     else:
-                        # ---  Pretty Print succesfull translation to Shell ---
-                        # Using clean formatting for easy terminal reading
-                        #print(f"  ORIG: {original_markdown[:100].replace(os.linesep, ' ')}...")
-                        #print(f"  AI  : {translated_markdown[:100].replace(os.linesep, ' ')}...")
-            
                         # --- Update TLB and commit ---
                         cursor.execute(    
                             "INSERT OR REPLACE INTO tlb (fingerprint, source_text, target_text, lang_code) VALUES (?, ?, ?, ?)",
@@ -143,32 +144,63 @@ def translate_pptx(file_path, languages, prompt, model, conn):
                         sql_file.write(f"/* FIX AND UNCOMMENT IF NECESSARY!!!\n ORIG: {entry['text']}\n CURRENT: {entry['translation']}*/\n")
                         sql_file.write(f"/* UPDATE tlb SET target_text = '{sql_trans}' WHERE fingerprint = '{entry['id']}';*/\n")
                 sql_file.close()
+        print("\n[CHECKPOINT] Press ENTER to process the next translations, or Ctrl+C to stop here.")
+        input(">> ")
 
-        ###############################################
-        # 5. UPDATE FILE IF NOTHING MISSING
-        ###############################################
-        if all_done:
-            for slide in prs.slides:
-                shape_map = {s.shape_id: s for s in slide.shapes if hasattr(s, "text")}
-                slide_data = get_slide_shapes(slide)
-                if not slide_data:
-                    continue
+
+###############################################
+# CREATING TRANSLATED FILES
+###############################################
+
+def create_translated_pptx(file_path, languages,conn):
+    path = Path(file_path)
+    cursor = conn.cursor()
+    
+    # Get original file's last modified time
+    orig_mtime = path.stat().st_mtime
+
+    for lang in languages:
+        language_name = lang_code_to_text(lang)
+        trans_path = path.parent / f"{path.stem}_{lang}{path.suffix}"
+        ppath = str(path)[-30:]
+        ptrans_path = str(trans_path)[-30:]
+        translation_ok = True
+        
+        # CHANGE DETECTION:
+        # a) File doesn't exist
+        # b) Original is newer than the translation
+        needs_rebuild = not trans_path.exists() or (orig_mtime > trans_path.stat().st_mtime)
+        
+        if not needs_rebuild:
+            continue
+
+        prs = Presentation(path)
+
+        for slide in prs.slides:
+            shape_map = {s.shape_id: s for s in slide.shapes if hasattr(s, "text")}
+            slide_data = get_slide_shapes(slide)
+            if not slide_data:
+                continue
                 
-                # Fetch translation from TLB
-                for shape_id, fingerprint in slide_data:
-                    cursor.execute("SELECT target_text FROM tlb WHERE fingerprint=?", (fingerprint,))
-                    row = cursor.fetchone()
-                    #push markdown into shape
+            # Fetch translation from TLB
+            for shape_id, fingerprint in slide_data:
+                cursor.execute("SELECT target_text FROM tlb WHERE fingerprint=?", (fingerprint,))
+                row = cursor.fetchone()
+                #push markdown into shape
+                if row:
                     markdown_to_shape(shape_map[shape_id], row[0])            
-
+                else:
+                    translation_ok = False
+                    break
+            if not translation_ok:
+                break
+        if translation_ok:
             prs.save(trans_path)
             print(f"[{lang}] Successfully updated {trans_path.name}")
         else:
             # No translation, delete the translated file
             # trans_path.unlink()
             print(f"[{lang}] Translation for {trans_path.name} has failed, please insert manual translations to TLB!")
-    print("\n[CHECKPOINT] Press ENTER to process the next file, or Ctrl+C to stop here.")
-    input(">> ")
 
 
 #############################################################################
@@ -188,7 +220,7 @@ if __name__ == "__main__":
     db = init_db()
     
     #Initialise genAI
-    model = getAI(AI=config["gen_ai"]["AI"],api_key=config["gen_ai"]["API_KEY"],model=config["gen_ai"]["Model"],timeout=config["gen_ai"]["Request_timeout_ms"],maxperminute=config["gen_ai"]["Max_requests_per_minute"],minimum_translations=config["gen_ai"]["Minimum_translations"])
+    model = getAI(AI=config["gen_ai"]["AI"],api_key=config["gen_ai"]["API_KEY"],model=config["gen_ai"]["Model"],timeout=config["gen_ai"]["Request_timeout_ms"],maxperminute=config["gen_ai"]["Max_requests_per_minute"])
 
     #For every publication
     for pub in publications:
@@ -197,11 +229,12 @@ if __name__ == "__main__":
         if config[pub]['translate_to'] == "":
             continue
         languages = config[pub]['translate_to'].split(",")
+
+        # Initialise course/publication object
         courseObject = create_course_object(config, pub)
-        #Check headers etc.
-        translate_pptx((Path(courseObject.course_slides_dir) / config["settings"]["headerfile"]).with_suffix(".pptx"), languages, config[pub]['ai_prompt'],model,db)
-        translate_pptx((Path(courseObject.course_slides_dir) / config["settings"]["dividerfile"]).with_suffix(".pptx"), languages,config[pub]['ai_prompt'], model,db)
-        translate_pptx((Path(courseObject.course_slides_dir) / config["settings"]["footerfile"]).with_suffix(".pptx"),  languages, config[pub]['ai_prompt'], model,db)
+        texts_to_translate = {}
+        for lang in languages:
+            texts_to_translate[lang] = []
         # Read the lecture names and topics from the configuration, error if not enough lecture definitions are found:
         try:
             for x in range(1, courseObject.lectures+1):
@@ -211,11 +244,27 @@ if __name__ == "__main__":
         except KeyError:
             print(f"Lectures should be added as <lecturenumber = name, topic1, topic2 ... topicN> under publication {courseObject.name} in settings.ini")
             continue
+
+        # Determine list of files
+        files = []
+        files.append((Path(courseObject.course_slides_dir) / config["settings"]["headerfile"]).with_suffix(".pptx"))
+        files.append((Path(courseObject.course_slides_dir) / config["settings"]["dividerfile"]).with_suffix(".pptx"))
+        files.append((Path(courseObject.course_slides_dir) / config["settings"]["footerfile"]).with_suffix(".pptx"))
+
         # Go through lectures
         for n in range(1, courseObject.lectures+1):
             for topic in courseObject.lecture_list[n-1].topic_list:
-                topic = f"{topic}.pptx"
-                translate_pptx(Path(config['settings']['lecture_slides_dir']) / topic, languages, config[pub]['ai_prompt'], model,db)
+                files.append((Path(config['settings']['lecture_slides_dir']) / topic).with_suffix(".pptx"))
             #publication-specific additional lecture slides
-            translate_pptx(next(Path(config[pub]['course_slides_dir']).glob(f"*{n:02d}*.pptx"),None), languages, config[pub]['ai_prompt'], model,db)
+            files.append(next((p for p in Path(config[pub]['course_slides_dir']).glob(f"*{n:02d}*.pptx") if not re.search(r'_[a-zA-Z]{2}\.pptx$', p.name)), None))
+        # Collect texts:
+        for f in files:
+            collect_texts_from_pptx(f, languages,db, texts_to_translate)
+
+        # Make translations for this publication
+        translate_texts(texts_to_translate,int(config['gen_ai']['batch_size']), config[pub]['ai_prompt'], model,db)
+
+        # Make translated files:
+        for f in files:
+            create_translated_pptx(f,languages,db)
 
