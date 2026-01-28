@@ -243,6 +243,7 @@ def publish_lectures(courseObject,config,lang):
                 else:
                     if not silent:
                         print(f"    \_{BOLD}Materiaalia on päivitetty -> julkaistaan{RESET}")
+
                 newslides = PdfWriter()
 
                     # Take starting slide, update course and lecture name
