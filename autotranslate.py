@@ -75,10 +75,13 @@ def collect_texts_from_pptx(file_path, languages,conn,list_of_texts):
                 
             # 3.1 CHECK TLB
             for shape_id, fingerprint in slide_data:
+                text = get_shape_markdown(shape_map[shape_id]).strip()
+                if not text:
+                    continue
                 cursor.execute("SELECT EXISTS(SELECT 1 FROM tlb WHERE fingerprint=? AND lang_code=?)", (fingerprint,lang))
                 exists = cursor.fetchone()[0]  
                 if not exists:
-                    list_of_texts[lang].append( {"id": fingerprint, "text": get_shape_markdown(shape_map[shape_id]), "translation": ""})
+                    list_of_texts[lang].append( {"id": fingerprint, "text": text, "translation": ""})
             #n += 1
 
 #############################################################################
@@ -184,6 +187,9 @@ def create_translated_pptx(file_path, languages,conn):
                 
             # Fetch translation from TLB
             for shape_id, fingerprint in slide_data:
+                text = get_shape_markdown(shape_map[shape_id]).strip()
+                if not text:
+                    continue
                 cursor.execute("SELECT target_text FROM tlb WHERE fingerprint=?", (fingerprint,))
                 row = cursor.fetchone()
                 #push markdown into shape
