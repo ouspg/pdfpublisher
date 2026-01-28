@@ -1,4 +1,5 @@
 import argparse
+from database import init_db, connect_to_db
 from copy import deepcopy
 import sys
 import re
@@ -11,7 +12,7 @@ from pypdf._page import PageObject
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.lib import colors
-from classes import Course
+from classes import Course, create_course_object
 from config import load_config
 
 BOLD = "\033[1m"
@@ -109,24 +110,6 @@ def load_full_directory(directory):
         files[f.name]["file"] = f
         files[f.name]["modtime"] = mtime
     return files
-
-def create_course_object(config, pub):
-    courseObject = Course(config[pub]['coursecode'],
-                            config[pub]['coursesize'],
-                            int(config[pub]['lectures']),
-                            config[pub]['coursename'],
-                            config[pub]['filename_prefix'],
-                            config[pub]['lectureterm'],
-                            config[pub]['publish_dir'],
-                            config[pub]['course_slides_dir'])
-    try:
-        for x in range(1, courseObject.lectures+1):
-            lecturelist = config[pub][str(x)].split(";")
-            lecture_name = lecturelist.pop(0).strip()
-            courseObject.add_lecture(lecture_name, x, [topic.strip() for topic in lecturelist])
-    except KeyError:
-        print(f"Lectures should be added as <lecturenumber = name, topic1, topic2 ... topicN> under publication {courseObject.name} in settings.ini")
-    return courseObject
 
 def link_health_check(config, pub, silent):
     if not silent:

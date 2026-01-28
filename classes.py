@@ -1,3 +1,21 @@
+def create_course_object(config, pub):
+    courseObject = Course(config[pub]['coursecode'],
+                            config[pub]['coursesize'],
+                            int(config[pub]['lectures']),
+                            config[pub]['coursename'],
+                            config[pub]['filename_prefix'],
+                            config[pub]['lectureterm'],
+                            config[pub]['publish_dir'], 
+                            config[pub]['course_slides_dir'])
+    try:
+        for x in range(1, courseObject.lectures+1):  
+            lecturelist = config[pub][str(x)].split(";")
+            lecture_name = lecturelist.pop(0).strip()
+            courseObject.add_lecture(lecture_name, x, [topic.strip() for topic in lecturelist])
+    except KeyError:
+        print(f"Lectures should be added as <lecturenumber = name, topic1, topic2 ... topicN> under publication {courseObject.name} in settings.ini")
+    return courseObject
+
 class Course:
     def __init__(self, coursecode: str, coursesize: str, lectures: int, name: str, filename_prefix: str, lectureterm: str, publication_dir: str, course_slides_dir: str):
         self.name = name
