@@ -28,9 +28,10 @@ class Course:
         self.course_slides_dir = course_slides_dir
         self.lecture_list = list()
 
-    def add_lecture(self, name, lectureNumber, list):
+    def add_lecture(self, name, lectureNumber, topic_list):
+        clean_topic_list = [item for item in topic_list if item and str(item).strip()]
         self.lecture_list.append(
-            Lecture(name, lectureNumber, list)
+            Lecture(name, lectureNumber, clean_topic_list)
         )
 
 class Lecture():
