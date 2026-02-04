@@ -87,8 +87,9 @@ def markdown_to_text_shape(shape, markdown_text):
                     except AttributeError:
                         color_rgb = None
     
-    # Fallback to a standard size if no font info was found (e.g., empty box)
-    avg_size = sum(sizes) / len(sizes) if sizes else 18
+    # Fallback to a standard size if no font info was found
+    # Use average size -1 just in case translation is longer or to offset if a too big font has more runs.
+    avg_size = ((sum(sizes) / len(sizes)) -1) if sizes else 18
 
     text_frame.clear() # Wipe existing content
     #Set autosize    
