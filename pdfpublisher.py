@@ -243,42 +243,49 @@ def publish_lectures(courseObject,config,lang):
                 else:
                     if not silent:
                         print(f"    \_{BOLD}Materiaalia on päivitetty -> julkaistaan{RESET}")
-                newslides = PdfWriter()
+
+                try:
+                    newslides = PdfWriter()
 
                     # Take starting slide, update course and lecture name
-                firstslide = deepcopy(Startingslides.pages[0])
-                add_title(firstslide,courseObject.lectureterm,n,courseObject.lecture_list[n-1].name,config["titlefont"]["font"],int(config["titlefont"]["font_max_size"]),int(config["titlefont"]["font_max_size"]),config["titlefont"]["colour"],int(config["titlefont"]["maxlines"]));
+                    firstslide = deepcopy(Startingslides.pages[0])
+                    add_title(firstslide,courseObject.lectureterm,n,courseObject.lecture_list[n-1].name,config["titlefont"]["font"],int(config["titlefont"]["font_max_size"]),int(config["titlefont"]["font_max_size"]),config["titlefont"]["colour"],int(config["titlefont"]["maxlines"]));
 
-                newslides.add_page(firstslide)
-                for page in Startingslides.pages[1:]:
-                    newslides.add_page(page)
-
-                # make lecture slides from topics
-                for topic in courseObject.lecture_list[n-1].topic_list:
-                    Lectureslides = PdfReader(slide_updates[f"{topic}{suffix}"]["file"])
-                    for page in Lectureslides.pages:
+                    newslides.add_page(firstslide)
+                    for page in Startingslides.pages[1:]:
                         newslides.add_page(page)
 
-                 # Insert divider slides
-                for page in Dividerslides.pages:
-                    newslides.add_page(page)
+                    # make lecture slides from topics
+                    for topic in courseObject.lecture_list[n-1].topic_list:
+                        Lectureslides = PdfReader(slide_updates[f"{topic}{suffix}"]["file"])
+                        for page in Lectureslides.pages:
+                            newslides.add_page(page)
 
-                # Insert course-specific slides into the placeholder
-                Courseslides = PdfReader(pubslides[n]["file"])
-                for page in Courseslides.pages:
-                    newslides.add_page(page)
+                    # Insert divider slides
+                    for page in Dividerslides.pages:
+                        newslides.add_page(page)
 
-                # Insert footer slides
-                for page in Endingslides.pages:
-                    newslides.add_page(page)
+                    # Insert course-specific slides into the placeholder
+                    Courseslides = PdfReader(pubslides[n]["file"])
+                    for page in Courseslides.pages:
+                        newslides.add_page(page)
 
-                # Write to file
-                if not silent:
-                    #print("Luodaan pdf...")
-                    print(f"    \_{BOLD}Tallennetaan PDF{RESET}")
-                filename = re.sub(r'[\\/]', '', f"{n:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {n}: {courseObject.lecture_list[n-1].name}{suffix}")[:200]
-                with open(published_slides,"wb") as f:
-                    newslides.write(f)
+                    # Insert footer slides
+                    for page in Endingslides.pages:
+                        newslides.add_page(page)
+
+                    # Write to file
+                    if not silent:
+                        #print("Luodaan pdf...")
+                        print(f"    \_{BOLD}Tallennetaan PDF{RESET}")
+                    filename = re.sub(r'[\\/]', '', f"{n:02} - {config[pub]['filename_prefix']} {config[pub]['lectureterm']} {n}: {courseObject.lecture_list[n-1].name}{suffix}")[:200]
+                    with open(published_slides,"wb") as f:
+                        newslides.write(f)
+                except TimeoutError:
+                    print(f"    \_{RED}❌ Error: Connection timed out while accessing '{filename}'. Network drive issue?{RESET}")        
+                except FileNotFoundError:
+                    print(f"    \_{RED}❌ Error: The file '{filename}' could not be found.{RESET}")
+                 
 
 def publish_materials(courseObject,config):
     # Go through all or a subset of lectures
